@@ -70,7 +70,7 @@ The full implementation plan is in `docs/specs/01-init.md`. It defines 9 stages:
 | Stage | Name                  | Status  | Description                                              |
 |-------|-----------------------|---------|----------------------------------------------------------|
 | 1     | Project scaffold      | **Done**| CLI skeleton with `typer`, `rich`, `pydantic`, `libtmux` |
-| 2     | Worktrunk wrapper     | Pending | Python wrapper around `wt` CLI commands                  |
+| 2     | Worktrunk wrapper     | **Done**| Python wrapper around `wt` CLI commands                  |
 | 3     | Profile system        | Pending | Named profile configs for agent roles                    |
 | 4     | tmux wrapper          | Pending | `libtmux` wrapper for managing panes                     |
 | 5     | Session state         | Pending | Persistent session store (`sessions.json`)               |
@@ -105,9 +105,11 @@ src/agent/
 ├── profile.py      # AgentProfile model + loader (stub)
 ├── session.py      # AgentSession model + state file (stub)
 ├── tmux.py         # libtmux wrapper (stub)
-├── worktrunk.py    # wt subprocess wrapper (stub)
+├── worktrunk.py    # wt subprocess wrapper (WorktreeInfo, WorktrunkError, create/remove/list/merge)
 ├── init.py         # post-init script runner (not yet created)
 └── profiles/       # bundled profile templates
+tests/
+└── test_worktrunk.py  # unit tests with subprocess mocking (19 tests)
 ```
 
 Profiles live at `~/.config/agent/profiles/<name>.toml`.
