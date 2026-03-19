@@ -1,41 +1,118 @@
-# Agent Instructions
+# AGENTS.md
 
-This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
+> **This file must always reflect the current state of the repository.**
+> When adding features, fixing bugs, or making any structural changes, update this file as part of the same change.
 
-## Quick Reference
+## Issue Tracking
+
+This project uses **Beads** (`bd`) for issue tracking. Issues live in `.beads/issues.jsonl` and are managed entirely via the CLI.
+
+Run `bd onboard` to get oriented.
+
+### Common Commands
 
 ```bash
-bd ready              # Find available work
-bd show <id>          # View issue details
-bd update <id> --status in_progress  # Claim work
-bd close <id>         # Complete work
-bd sync               # Sync with git
+bd ready                              # Find available work
+bd list                               # View all issues
+bd show <id>                          # View issue details
+bd create "Description of the issue"  # Create a new issue
+bd update <id> --status in_progress   # Claim work
+bd update <id> --status done          # Mark work done
+bd close <id>                         # Close an issue
+bd sync                               # Sync with git
 ```
 
-## Landing the Plane (Session Completion)
+See `.beads/README.md` for full documentation.
 
-**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
+## Maintaining AGENTS.md
 
-**MANDATORY WORKFLOW:**
+**This is a critical rule.** Every change to the repository that adds, removes, or modifies features, fixes, or project structure **must** include an update to this file. AGENTS.md is the source of truth for what exists in this repo and how it works.
 
-1. **File issues for remaining work** - Create issues for anything that needs follow-up
-2. **Run quality gates** (if code changed) - Tests, linters, builds
-3. **Update issue status** - Close finished work, update in-progress items
-4. **PUSH TO REMOTE** - This is MANDATORY:
+When making changes:
+1. Update the relevant section below to reflect the new state
+2. Add new sections if introducing entirely new concepts
+3. Remove sections for deleted functionality
+4. Keep descriptions concise and accurate
+
+## Project Overview
+
+**Yet Another Agent Manager** — A Python CLI tool that manages tmux sessions and git worktrees (via Worktrunk), with a path to multi-agent orchestration via LangGraph.
+
+Agent sessions are driven by **profiles** — named configurations that bundle a base repository, a tmux layout script, and a post-init script. Spawning an agent with a profile fully automates the environment setup for that agent role.
+
+## Repository Structure
+
+```
+docs/
+  specs/
+    01-init.md        # Full implementation plan (9 stages)
+.beads/               # Beads issue tracking data
+  README.md           # Beads usage documentation
+  issues.jsonl        # Issue database
+AGENTS.md             # This file — repo state and agent instructions
+```
+
+## Implementation Plan
+
+The full implementation plan is in `docs/specs/01-init.md`. It defines 9 stages:
+
+| Stage | Name                  | Status  | Description                                              |
+|-------|-----------------------|---------|----------------------------------------------------------|
+| 1     | Project scaffold      | Pending | CLI skeleton with `typer`, `rich`, `pydantic`, `libtmux` |
+| 2     | Worktrunk wrapper     | Pending | Python wrapper around `wt` CLI commands                  |
+| 3     | Profile system        | Pending | Named profile configs for agent roles                    |
+| 4     | tmux wrapper          | Pending | `libtmux` wrapper for managing panes                     |
+| 5     | Session state         | Pending | Persistent session store (`sessions.json`)               |
+| 6     | Core commands         | Pending | `agent new`, `agent list`, `agent kill`                  |
+| 7     | Attach and sync       | Pending | `agent attach`, `agent sync`                             |
+| 8     | LangGraph orchestrator| Pending | Multi-agent supervisor with LangGraph                    |
+| 9     | Polish and packaging  | Pending | Shell completions, `agent doctor`, PyPI packaging        |
+
+## Dependencies
+
+| Package               | Purpose                  |
+|-----------------------|--------------------------|
+| `typer`               | CLI interface            |
+| `rich`                | Terminal output          |
+| `pydantic`            | Data models              |
+| `libtmux`             | tmux control             |
+| `filelock`            | Safe state writes        |
+| `tomllib` / `tomli`   | Config + profile parsing |
+| `langgraph`           | Agent graph (Stage 8)    |
+| `langchain-anthropic` | Claude model (Stage 8)   |
+
+**External tools required:** `wt` (Worktrunk), `tmux`
+**Dev tooling:** `uv` (package manager), `ruff` (linter + formatter)
+
+## Target Package Structure
+
+```
+agent/
+├── cli.py          # typer app entry point
+├── config.py       # user config model
+├── profile.py      # AgentProfile model + loader
+├── session.py      # AgentSession model + state file
+├── tmux.py         # libtmux wrapper
+├── worktrunk.py    # wt subprocess wrapper
+└── init.py         # post-init script runner
+```
+
+Profiles live at `~/.config/agent/profiles/<name>.toml`.
+Session state lives at `~/.config/agent/sessions.json`.
+
+## Session Completion Workflow
+
+When ending a work session, complete ALL steps:
+
+1. **File issues** for remaining work (`bd create "..."`)
+2. **Run quality gates** if code changed (tests, `ruff check`, `ruff format --check`)
+3. **Update issue status** — close finished work, update in-progress items
+4. **Push to remote** — this is mandatory:
    ```bash
    git pull --rebase
    bd sync
    git push
-   git status  # MUST show "up to date with origin"
+   git status  # Must show "up to date with origin"
    ```
-5. **Clean up** - Clear stashes, prune remote branches
-6. **Verify** - All changes committed AND pushed
-7. **Hand off** - Provide context for next session
-
-**CRITICAL RULES:**
-- Work is NOT complete until `git push` succeeds
-- NEVER stop before pushing - that leaves work stranded locally
-- NEVER say "ready to push when you are" - YOU must push
-- If push fails, resolve and retry until it succeeds
-
-Use 'bd' for task tracking
+5. **Verify** all changes are committed and pushed
+6. **Hand off** context for the next session
