@@ -43,6 +43,16 @@ Agent sessions are driven by **profiles** — named configurations that bundle a
 ## Repository Structure
 
 ```
+src/
+  agent/
+    __init__.py       # Package root
+    cli.py            # typer app entry point
+    config.py         # user config model (stub)
+    profile.py        # AgentProfile model + loader (stub)
+    session.py        # AgentSession model + state file (stub)
+    tmux.py           # libtmux wrapper (stub)
+    worktrunk.py      # wt subprocess wrapper (stub)
+    profiles/         # bundled profile templates
 docs/
   specs/
     01-init.md        # Full implementation plan (9 stages)
@@ -50,6 +60,7 @@ docs/
   README.md           # Beads usage documentation
   issues.jsonl        # Issue database
 AGENTS.md             # This file — repo state and agent instructions
+pyproject.toml        # Project config, dependencies, ruff, entry points
 ```
 
 ## Implementation Plan
@@ -58,7 +69,7 @@ The full implementation plan is in `docs/specs/01-init.md`. It defines 9 stages:
 
 | Stage | Name                  | Status  | Description                                              |
 |-------|-----------------------|---------|----------------------------------------------------------|
-| 1     | Project scaffold      | Pending | CLI skeleton with `typer`, `rich`, `pydantic`, `libtmux` |
+| 1     | Project scaffold      | **Done**| CLI skeleton with `typer`, `rich`, `pydantic`, `libtmux` |
 | 2     | Worktrunk wrapper     | Pending | Python wrapper around `wt` CLI commands                  |
 | 3     | Profile system        | Pending | Named profile configs for agent roles                    |
 | 4     | tmux wrapper          | Pending | `libtmux` wrapper for managing panes                     |
@@ -84,17 +95,19 @@ The full implementation plan is in `docs/specs/01-init.md`. It defines 9 stages:
 **External tools required:** `wt` (Worktrunk), `tmux`
 **Dev tooling:** `uv` (package manager), `ruff` (linter + formatter)
 
-## Target Package Structure
+## Package Structure
 
 ```
-agent/
-├── cli.py          # typer app entry point
-├── config.py       # user config model
-├── profile.py      # AgentProfile model + loader
-├── session.py      # AgentSession model + state file
-├── tmux.py         # libtmux wrapper
-├── worktrunk.py    # wt subprocess wrapper
-└── init.py         # post-init script runner
+src/agent/
+├── __init__.py     # package root
+├── cli.py          # typer app entry point (stub commands wired up)
+├── config.py       # user config model (stub)
+├── profile.py      # AgentProfile model + loader (stub)
+├── session.py      # AgentSession model + state file (stub)
+├── tmux.py         # libtmux wrapper (stub)
+├── worktrunk.py    # wt subprocess wrapper (stub)
+├── init.py         # post-init script runner (not yet created)
+└── profiles/       # bundled profile templates
 ```
 
 Profiles live at `~/.config/agent/profiles/<name>.toml`.
