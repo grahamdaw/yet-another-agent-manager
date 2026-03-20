@@ -3,7 +3,7 @@
 Nodes
 -----
 plan_node       - Supervisor breaks the goal into tasks and assigns profiles.
-dispatch_node   - Spawns an agent session per task via `agent new`.
+dispatch_node   - Spawns an agent session per task via `yaam new`.
 monitor_node    - Polls pane liveness and result files.
 collect_node    - Reads result files written by worker agents.
 review_node     - Supervisor reviews results and decides next step.
@@ -24,9 +24,9 @@ from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import END, StateGraph
 
-from agent import session as session_mod
-from agent import tmux as tmux_mod
-from agent.orchestrator.models import OrchestratorState, Task, TaskResult
+from yaam import session as session_mod
+from yaam import tmux as tmux_mod
+from yaam.orchestrator.models import OrchestratorState, Task, TaskResult
 
 # ---------------------------------------------------------------------------
 # Config
@@ -87,7 +87,7 @@ def dispatch_node(state: OrchestratorState) -> dict:
     for task in state["tasks"]:
         agent_name = f"orch-{task['id']}"
         cmd = [
-            "agent",
+            "yaam",
             "new",
             agent_name,
             "--profile",

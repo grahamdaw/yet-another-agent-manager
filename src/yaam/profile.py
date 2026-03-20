@@ -31,7 +31,7 @@ def _ensure_example_profile() -> None:
     if any(d.glob("*.toml")):
         return
     example_dest = d / "example.toml"
-    ref = importlib.resources.files("agent.profiles").joinpath("example.toml")
+    ref = importlib.resources.files("yaam.profiles").joinpath("example.toml")
     example_dest.write_text(ref.read_text(encoding="utf-8"), encoding="utf-8")
 
 

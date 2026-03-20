@@ -7,7 +7,7 @@ from pathlib import Path
 from filelock import FileLock
 from pydantic import BaseModel, ConfigDict, field_serializer, field_validator
 
-from agent.tmux import PaneRef
+from yaam.tmux import PaneRef
 
 STATE_FILE = Path("~/.config/agent/sessions.json")
 
