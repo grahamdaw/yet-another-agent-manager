@@ -29,7 +29,6 @@ def _profile(**kwargs) -> AgentProfile:
         name="backend",
         description="Backend",
         repo_path=Path("/repo"),
-        default_branch_prefix="agent/",
         tmux_setup_script=Path("/scripts/tmux.sh"),
         init_script=Path("/scripts/init.sh"),
         init_env={},
@@ -41,7 +40,7 @@ def _profile(**kwargs) -> AgentProfile:
 def _session(**kwargs) -> AgentSession:
     defaults = dict(
         name="foo",
-        branch="agent/foo",
+        branch="foo",
         profile_name="backend",
         worktree_path=_WORKTREE,
         tmux_session="agent",
@@ -57,7 +56,7 @@ def _cfg() -> MagicMock:
     return MagicMock(tmux_session_name="agent")
 
 
-def _worktree_info(branch: str = "agent/foo") -> WorktreeInfo:
+def _worktree_info(branch: str = "foo") -> WorktreeInfo:
     return WorktreeInfo(branch=branch, path=_WORKTREE, status="clean", head="abc123")
 
 
@@ -182,6 +181,25 @@ def test_new_custom_branch():
         runner.invoke(app, ["new", "foo", "--profile", "backend", "--branch", "my-custom-branch"])
 
     mock_create.assert_called_once_with("my-custom-branch", Path("/repo"))
+
+
+def test_new_branch_matches_session_name():
+    with (
+        patch("yaam.cli.profile_mod.load", return_value=_profile()),
+        patch("yaam.cli.profile_mod.validate", return_value=[]),
+        patch(
+            "yaam.cli.worktrunk.create", return_value=_worktree_info("my-feature")
+        ) as mock_create,
+        patch("yaam.cli.tmux_mod.get_or_create_session"),
+        patch("yaam.cli.tmux_mod.run_setup_script"),
+        patch("yaam.cli.tmux_mod.create_pane", return_value=_PANE_REF),
+        patch("yaam.cli.init_mod.run"),
+        patch("yaam.cli.SessionStore"),
+        patch("yaam.cli.config_mod.load_config", return_value=_cfg()),
+    ):
+        runner.invoke(app, ["new", "my-feature", "--profile", "backend"])
+
+    mock_create.assert_called_once_with("my-feature", Path("/repo"))
 
 
 # ---------------------------------------------------------------------------
