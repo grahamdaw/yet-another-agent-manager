@@ -84,6 +84,9 @@ def new(
         with console.status(f"Creating worktree for branch '[cyan]{branch_name}[/cyan]'..."):
             worktree_info = worktrunk.create(branch_name, p.repo_path)
 
+        with console.status("Running init script..."):
+            init_mod.run(p.init_script, p.repo_path, worktree_info.path, p.init_env, name)
+
         with console.status("Running tmux setup script..."):
             tmux_mod.get_or_create_session(cfg.tmux_session_name)
             tmux_mod.run_setup_script(
@@ -92,9 +95,6 @@ def new(
 
         with console.status(f"Creating pane for '[cyan]{name}[/cyan]'..."):
             pane_ref = tmux_mod.create_pane(cfg.tmux_session_name, name)
-
-        with console.status("Running init script..."):
-            init_mod.run(p.init_script, p.repo_path, worktree_info.path, p.init_env, name)
 
         SessionStore().add(
             AgentSession(
@@ -351,7 +351,9 @@ def doctor() -> None:
     console.print("[bold]Checking environment...[/bold]\n")
 
     # wt (Worktrunk) available?
-    _check("wt (Worktrunk) installed", shutil.which("wt") is not None, "run: brew install worktrunk")
+    _check(
+        "wt (Worktrunk) installed", shutil.which("wt") is not None, "run: brew install worktrunk"
+    )
 
     # tmux available?
     _check("tmux installed", shutil.which("tmux") is not None, "run: brew install tmux")

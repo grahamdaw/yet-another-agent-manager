@@ -112,9 +112,6 @@ def test_new_cleans_up_on_init_failure():
         patch("yaam.cli.profile_mod.load", return_value=_profile()),
         patch("yaam.cli.profile_mod.validate", return_value=[]),
         patch("yaam.cli.worktrunk.create", return_value=_worktree_info()),
-        patch("yaam.cli.tmux_mod.get_or_create_session"),
-        patch("yaam.cli.tmux_mod.run_setup_script"),
-        patch("yaam.cli.tmux_mod.create_pane", return_value=_PANE_REF),
         patch("yaam.cli.init_mod.run", side_effect=InitScriptError("boom")),
         patch("yaam.cli.tmux_mod.kill_pane") as mock_kill,
         patch("yaam.cli.worktrunk.remove") as mock_remove,
@@ -123,8 +120,30 @@ def test_new_cleans_up_on_init_failure():
         result = runner.invoke(app, ["new", "foo", "--profile", "backend"])
 
     assert result.exit_code == 1
-    mock_kill.assert_called_once_with(_PANE_REF)
+    mock_kill.assert_not_called()
     mock_remove.assert_called_once_with(_WORKTREE)
+
+
+def test_new_init_runs_before_tmux(tmp_path):
+    call_order = []
+    with (
+        patch("yaam.cli.profile_mod.load", return_value=_profile()),
+        patch("yaam.cli.profile_mod.validate", return_value=[]),
+        patch("yaam.cli.worktrunk.create", return_value=_worktree_info()),
+        patch("yaam.cli.init_mod.run", side_effect=lambda *a, **kw: call_order.append("init")),
+        patch(
+            "yaam.cli.tmux_mod.get_or_create_session",
+            side_effect=lambda *a: call_order.append("tmux"),
+        ),
+        patch("yaam.cli.tmux_mod.run_setup_script"),
+        patch("yaam.cli.tmux_mod.create_pane", return_value=_PANE_REF),
+        patch("yaam.cli.SessionStore"),
+        patch("yaam.cli.config_mod.load_config", return_value=_cfg()),
+    ):
+        result = runner.invoke(app, ["new", "foo", "--profile", "backend"])
+
+    assert result.exit_code == 0
+    assert call_order == ["init", "tmux"]
 
 
 def test_new_cleans_up_worktree_if_no_pane_yet():
