@@ -192,13 +192,78 @@ def kill(name: str = typer.Argument(help="Name of the agent session to kill")) -
 @app.command()
 def attach(name: str = typer.Argument(help="Name of the agent session to attach to")) -> None:
     """Attach to an existing agent session."""
-    console.print(f"[bold]agent attach[/bold] is not yet implemented (name={name})")
+    store = SessionStore()
+    session = store.get(name)
+    if session is None:
+        console.print(f"[red]Error:[/red] No session named '{name}'")
+        raise typer.Exit(1)
+
+    if not tmux_mod.pane_alive(session.tmux_pane_ref):
+        console.print(
+            f"[red]Error:[/red] Pane for '{name}' is dead. Run [bold]agent sync --fix[/bold]."
+        )
+        raise typer.Exit(1)
+
+    import subprocess
+
+    subprocess.run(
+        ["tmux", "switch-client", "-t", session.tmux_pane_ref.pane_id],
+        check=False,
+    )
 
 
 @app.command()
-def sync() -> None:
+def sync(
+    fix: bool = typer.Option(False, "--fix", help="Remove orphaned sessions from the store"),
+) -> None:
     """Sync session state with tmux and worktree status."""
-    console.print("[bold]agent sync[/bold] is not yet implemented")
+    sessions = SessionStore().list()
+    store = SessionStore()
+
+    if not sessions:
+        console.print("[yellow]No sessions in store.[/yellow]")
+        return
+
+    orphaned = []
+    live = []
+
+    for s in sessions:
+        try:
+            alive = tmux_mod.pane_alive(s.tmux_pane_ref)
+        except Exception:
+            alive = False
+        worktree_exists = s.worktree_path.exists()
+
+        if not alive or not worktree_exists:
+            orphaned.append((s, alive, worktree_exists))
+        else:
+            live.append(s)
+
+    if not orphaned:
+        console.print(f"[green]✓[/green] All {len(live)} session(s) healthy.")
+        return
+
+    table = Table(show_header=True, header_style="bold yellow")
+    table.add_column("Name", style="bold")
+    table.add_column("Branch")
+    table.add_column("Pane")
+    table.add_column("Worktree")
+
+    for s, pane_ok, wt_ok in orphaned:
+        table.add_row(
+            s.name,
+            s.branch,
+            "[green]alive[/green]" if pane_ok else "[red]dead[/red]",
+            "[green]exists[/green]" if wt_ok else "[red]missing[/red]",
+        )
+
+    console.print(f"[yellow]Found {len(orphaned)} orphaned session(s):[/yellow]")
+    console.print(table)
+
+    if fix:
+        for s, _, _ in orphaned:
+            store.remove(s.name)
+        console.print(f"[green]✓[/green] Removed {len(orphaned)} orphaned session(s) from store.")
 
 
 # ---------------------------------------------------------------------------

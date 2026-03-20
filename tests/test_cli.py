@@ -223,6 +223,101 @@ def test_list_handles_tmux_error_gracefully():
 
 
 # ---------------------------------------------------------------------------
+# agent attach
+# ---------------------------------------------------------------------------
+
+
+def test_attach_happy_path():
+    with (
+        patch("agent.cli.SessionStore") as mock_store_cls,
+        patch("agent.cli.tmux_mod.pane_alive", return_value=True),
+        patch("subprocess.run") as mock_run,
+    ):
+        mock_store_cls.return_value.get.return_value = _session()
+        result = runner.invoke(app, ["attach", "foo"])
+
+    assert result.exit_code == 0
+    mock_run.assert_called_once()
+
+
+def test_attach_unknown_session():
+    with patch("agent.cli.SessionStore") as mock_store_cls:
+        mock_store_cls.return_value.get.return_value = None
+        result = runner.invoke(app, ["attach", "ghost"])
+
+    assert result.exit_code == 1
+    assert "No session" in result.output
+
+
+def test_attach_dead_pane():
+    with (
+        patch("agent.cli.SessionStore") as mock_store_cls,
+        patch("agent.cli.tmux_mod.pane_alive", return_value=False),
+    ):
+        mock_store_cls.return_value.get.return_value = _session()
+        result = runner.invoke(app, ["attach", "foo"])
+
+    assert result.exit_code == 1
+    assert "dead" in result.output
+
+
+# ---------------------------------------------------------------------------
+# agent sync
+# ---------------------------------------------------------------------------
+
+
+def test_sync_all_healthy():
+    sessions = [_session()]
+    with (
+        patch("agent.cli.SessionStore") as mock_store_cls,
+        patch("agent.cli.tmux_mod.pane_alive", return_value=True),
+        patch("pathlib.Path.exists", return_value=True),
+    ):
+        mock_store_cls.return_value.list.return_value = sessions
+        result = runner.invoke(app, ["sync"])
+
+    assert result.exit_code == 0
+    assert "healthy" in result.output
+
+
+def test_sync_detects_dead_pane():
+    sessions = [_session()]
+    with (
+        patch("agent.cli.SessionStore") as mock_store_cls,
+        patch("agent.cli.tmux_mod.pane_alive", return_value=False),
+        patch("pathlib.Path.exists", return_value=True),
+    ):
+        mock_store_cls.return_value.list.return_value = sessions
+        result = runner.invoke(app, ["sync"])
+
+    assert result.exit_code == 0
+    assert "orphaned" in result.output.lower()
+
+
+def test_sync_fix_removes_orphans():
+    sessions = [_session()]
+    with (
+        patch("agent.cli.SessionStore") as mock_store_cls,
+        patch("agent.cli.tmux_mod.pane_alive", return_value=False),
+        patch("pathlib.Path.exists", return_value=True),
+    ):
+        mock_store_cls.return_value.list.return_value = sessions
+        result = runner.invoke(app, ["sync", "--fix"])
+
+    assert result.exit_code == 0
+    mock_store_cls.return_value.remove.assert_called_once_with("foo")
+
+
+def test_sync_empty_store():
+    with patch("agent.cli.SessionStore") as mock_store_cls:
+        mock_store_cls.return_value.list.return_value = []
+        result = runner.invoke(app, ["sync"])
+
+    assert result.exit_code == 0
+    assert "No sessions" in result.output
+
+
+# ---------------------------------------------------------------------------
 # agent kill
 # ---------------------------------------------------------------------------
 

@@ -75,7 +75,7 @@ The full implementation plan is in `docs/specs/01-init.md`. It defines 9 stages:
 | 4     | tmux wrapper          | **Done**| `libtmux` wrapper for managing panes                     |
 | 5     | Session state         | **Done**| Persistent session store (`sessions.json`)               |
 | 6     | Core commands         | **Done**| `agent new`, `agent list`, `agent kill`                  |
-| 7     | Attach and sync       | Pending | `agent attach`, `agent sync`                             |
+| 7     | Attach and sync       | **Done**| `agent attach`, `agent sync`                             |
 | 8     | LangGraph orchestrator| Pending | Multi-agent supervisor with LangGraph                    |
 | 9     | Polish and packaging  | Pending | Shell completions, `agent doctor`, PyPI packaging        |
 
