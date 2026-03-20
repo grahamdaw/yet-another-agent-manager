@@ -118,6 +118,9 @@ monitors progress, collects results, and reviews completion automatically.
 
 ## Profile authoring guide
 
+> **Tip:** If you are using Claude Code, there is a built-in skill to guide you through profile creation. Run `/create-profile` in a Claude Code session and it will walk you through writing the TOML, tmux setup script, and init script step by step.
+
+
 A profile bundles three things:
 
 | Field | Description |

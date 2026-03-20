@@ -142,7 +142,7 @@ Reusable agent instructions live in `.agents/skills/`. Each skill is a directory
 | Skill | Description |
 |---|---|
 | `feature-spec` | How to spec and register a new feature (check docs → write spec → review → create Beads issues → sync) |
-| `create-profile` | How to create a profile TOML, write tmux/init scripts, validate, and troubleshoot |
+| `create-profile` | How to create a profile TOML, write tmux/init scripts, validate, and troubleshoot. Use this skill (invoke with `/create-profile`) when creating or configuring a new agent profile. |
 
 When adding a new skill, create `.agents/skills/<name>/SKILL.md` and add a row to this table.
 
