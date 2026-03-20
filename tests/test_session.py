@@ -4,9 +4,9 @@ import datetime as dt
 import json
 from pathlib import Path
 
-from agent.config import AgentConfig, load_config
-from agent.session import AgentSession, SessionStore
-from agent.tmux import PaneRef
+from yaam.config import AgentConfig, load_config
+from yaam.session import AgentSession, SessionStore
+from yaam.tmux import PaneRef
 
 # ---------------------------------------------------------------------------
 # Helpers

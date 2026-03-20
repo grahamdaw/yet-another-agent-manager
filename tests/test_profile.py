@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from agent.profile import (
+from yaam.profile import (
     AgentProfile,
     ProfileNotFoundError,
     ProfileValidationError,
@@ -66,7 +66,7 @@ def _make_profile(**kwargs) -> AgentProfile:
 
 def test_load_returns_profile(tmp_path):
     _write_profile(tmp_path, "test")
-    with patch("agent.profile._profiles_dir", return_value=tmp_path):
+    with patch("yaam.profile._profiles_dir", return_value=tmp_path):
         p = load("test")
     assert p.name == "test"
     assert p.description == "Test profile"
@@ -79,7 +79,7 @@ def test_load_returns_profile(tmp_path):
 
 def test_load_raises_profile_not_found(tmp_path):
     with (
-        patch("agent.profile._profiles_dir", return_value=tmp_path),
+        patch("yaam.profile._profiles_dir", return_value=tmp_path),
         pytest.raises(ProfileNotFoundError, match="missing"),
     ):
         load("missing")
@@ -88,7 +88,7 @@ def test_load_raises_profile_not_found(tmp_path):
 def test_load_expands_home(tmp_path):
     content = MINIMAL_TOML.replace("/fake/repo", "~/projects/api")
     _write_profile(tmp_path, "home", content)
-    with patch("agent.profile._profiles_dir", return_value=tmp_path):
+    with patch("yaam.profile._profiles_dir", return_value=tmp_path):
         p = load("home")
     assert not str(p.repo_path).startswith("~")
 
@@ -96,7 +96,7 @@ def test_load_expands_home(tmp_path):
 def test_load_defaults_branch_prefix(tmp_path):
     content = MINIMAL_TOML.replace('default_branch_prefix = "agent/"', "")
     _write_profile(tmp_path, "noprefix", content)
-    with patch("agent.profile._profiles_dir", return_value=tmp_path):
+    with patch("yaam.profile._profiles_dir", return_value=tmp_path):
         p = load("noprefix")
     assert p.default_branch_prefix == "agent/"
 
@@ -104,7 +104,7 @@ def test_load_defaults_branch_prefix(tmp_path):
 def test_load_defaults_empty_env(tmp_path):
     content = MINIMAL_TOML.replace('env = { FOO = "bar" }', "")
     _write_profile(tmp_path, "noenv", content)
-    with patch("agent.profile._profiles_dir", return_value=tmp_path):
+    with patch("yaam.profile._profiles_dir", return_value=tmp_path):
         p = load("noenv")
     assert p.init_env == {}
 
@@ -118,7 +118,7 @@ def test_list_profiles_returns_all(tmp_path):
     _write_profile(tmp_path, "alpha")
     content_b = MINIMAL_TOML.replace('name = "test"', 'name = "beta"')
     _write_profile(tmp_path, "beta", content_b)
-    with patch("agent.profile._profiles_dir", return_value=tmp_path):
+    with patch("yaam.profile._profiles_dir", return_value=tmp_path):
         profiles = list_profiles()
     assert len(profiles) == 2
     names = {p.name for p in profiles}
@@ -127,20 +127,20 @@ def test_list_profiles_returns_all(tmp_path):
 
 
 def test_list_profiles_empty_dir(tmp_path):
-    with patch("agent.profile._profiles_dir", return_value=tmp_path):
+    with patch("yaam.profile._profiles_dir", return_value=tmp_path):
         assert list_profiles() == []
 
 
 def test_list_profiles_missing_dir(tmp_path):
     missing = tmp_path / "no_such_dir"
-    with patch("agent.profile._profiles_dir", return_value=missing):
+    with patch("yaam.profile._profiles_dir", return_value=missing):
         assert list_profiles() == []
 
 
 def test_list_profiles_skips_invalid(tmp_path):
     _write_profile(tmp_path, "good")
     (tmp_path / "bad.toml").write_text("this is not valid toml = = =")
-    with patch("agent.profile._profiles_dir", return_value=tmp_path):
+    with patch("yaam.profile._profiles_dir", return_value=tmp_path):
         profiles = list_profiles()
     assert len(profiles) == 1
     assert profiles[0].name == "test"
@@ -223,7 +223,7 @@ def test_validate_passes_for_valid_profile(tmp_path):
 
 
 def test_ensure_example_creates_file(tmp_path):
-    with patch("agent.profile._profiles_dir", return_value=tmp_path):
+    with patch("yaam.profile._profiles_dir", return_value=tmp_path):
         _ensure_example_profile()
     files = list(tmp_path.glob("*.toml"))
     assert len(files) == 1
@@ -234,7 +234,7 @@ def test_ensure_example_creates_file(tmp_path):
 
 def test_ensure_example_skips_if_profiles_exist(tmp_path):
     _write_profile(tmp_path, "existing")
-    with patch("agent.profile._profiles_dir", return_value=tmp_path):
+    with patch("yaam.profile._profiles_dir", return_value=tmp_path):
         _ensure_example_profile()
     # should not overwrite — only the existing profile remains
     files = list(tmp_path.glob("*.toml"))
