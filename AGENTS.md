@@ -71,7 +71,7 @@ The full implementation plan is in `docs/specs/01-init.md`. It defines 9 stages:
 |-------|-----------------------|---------|----------------------------------------------------------|
 | 1     | Project scaffold      | **Done**| CLI skeleton with `typer`, `rich`, `pydantic`, `libtmux` |
 | 2     | Worktrunk wrapper     | **Done**| Python wrapper around `wt` CLI commands                  |
-| 3     | Profile system        | Pending | Named profile configs for agent roles                    |
+| 3     | Profile system        | **Done**| Named profile configs for agent roles                    |
 | 4     | tmux wrapper          | Pending | `libtmux` wrapper for managing panes                     |
 | 5     | Session state         | Pending | Persistent session store (`sessions.json`)               |
 | 6     | Core commands         | Pending | `agent new`, `agent list`, `agent kill`                  |
@@ -106,10 +106,13 @@ src/agent/
 ├── session.py      # AgentSession model + state file (stub)
 ├── tmux.py         # libtmux wrapper (stub)
 ├── worktrunk.py    # wt subprocess wrapper (WorktreeInfo, WorktrunkError, create/remove/list/merge)
+├── profile.py      # AgentProfile model, load/list_profiles/validate, _ensure_example_profile
 ├── init.py         # post-init script runner (not yet created)
-└── profiles/       # bundled profile templates
+└── profiles/
+    └── example.toml  # bundled example profile written to ~/.config/agent/profiles/ on first run
 tests/
-└── test_worktrunk.py  # unit tests with subprocess mocking (19 tests)
+├── test_worktrunk.py  # 19 tests with subprocess mocking
+└── test_profile.py    # 17 tests for profile load/list/validate/example
 ```
 
 Profiles live at `~/.config/agent/profiles/<name>.toml`.

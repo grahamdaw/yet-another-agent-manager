@@ -2,6 +2,10 @@
 
 import typer
 from rich.console import Console
+from rich.table import Table
+
+from agent import profile as profile_mod
+from agent.profile import ProfileValidationError
 
 app = typer.Typer(
     name="agent",
@@ -51,7 +55,21 @@ def sync() -> None:
 @profile_app.command("list")
 def profile_list() -> None:
     """List available agent profiles."""
-    console.print("[bold]agent profile list[/bold] is not yet implemented")
+    profile_mod._ensure_example_profile()
+    profiles = profile_mod.list_profiles()
+    if not profiles:
+        console.print(
+            "[yellow]No profiles found.[/yellow] Add a .toml file to ~/.config/agent/profiles/"
+        )
+        return
+    table = Table(title="Agent Profiles", show_header=True, header_style="bold cyan")
+    table.add_column("Name", style="bold")
+    table.add_column("Description")
+    table.add_column("Repo Path")
+    table.add_column("Branch Prefix")
+    for p in profiles:
+        table.add_row(p.name, p.description, str(p.repo_path), p.default_branch_prefix)
+    console.print(table)
 
 
 @profile_app.command("validate")
@@ -59,4 +77,22 @@ def profile_validate(
     name: str = typer.Argument(help="Profile name to validate"),
 ) -> None:
     """Validate a profile configuration."""
-    console.print(f"[bold]agent profile validate[/bold] is not yet implemented (name={name})")
+    try:
+        p = profile_mod.load(name)
+    except FileNotFoundError as exc:
+        console.print(f"[red]Error:[/red] {exc}")
+        raise typer.Exit(1) from exc
+
+    try:
+        issues = profile_mod.validate(p)
+    except ProfileValidationError as exc:
+        console.print(f"[red]Validation error:[/red] {exc}")
+        raise typer.Exit(1) from exc
+
+    if issues:
+        console.print(f"[yellow]Profile '{name}' has issues:[/yellow]")
+        for issue in issues:
+            console.print(f"  [red]•[/red] {issue}")
+        raise typer.Exit(1)
+
+    console.print(f"[green]✓[/green] Profile '{name}' is valid.")
