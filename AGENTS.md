@@ -56,6 +56,11 @@ src/
 docs/
   specs/
     01-init.md        # Full implementation plan (9 stages)
+    02-rename-to-yaam.md  # Rename package/executable to yaam
+.agents/
+  skills/
+    feature-spec/     # Skill: how to spec and register a new feature
+    create-profile/   # Skill: how to create a profile configuration
 .beads/               # Beads issue tracking data
   README.md           # Beads usage documentation
   issues.jsonl        # Issue database
@@ -65,19 +70,20 @@ pyproject.toml        # Project config, dependencies, ruff, entry points
 
 ## Implementation Plan
 
-The full implementation plan is in `docs/specs/01-init.md`. It defines 9 stages:
+The full implementation plan is in `docs/specs/01-init.md`. Additional specs live in `docs/specs/`.
 
-| Stage | Name                  | Status  | Description                                              |
-|-------|-----------------------|---------|----------------------------------------------------------|
-| 1     | Project scaffold      | **Done**| CLI skeleton with `typer`, `rich`, `pydantic`, `libtmux` |
-| 2     | Worktrunk wrapper     | **Done**| Python wrapper around `wt` CLI commands                  |
-| 3     | Profile system        | **Done**| Named profile configs for agent roles                    |
-| 4     | tmux wrapper          | **Done**| `libtmux` wrapper for managing panes                     |
-| 5     | Session state         | **Done**| Persistent session store (`sessions.json`)               |
-| 6     | Core commands         | **Done**| `agent new`, `agent list`, `agent kill`                  |
-| 7     | Attach and sync       | **Done**| `agent attach`, `agent sync`                             |
-| 8     | LangGraph orchestrator| **Done**| Multi-agent supervisor with LangGraph                    |
-| 9     | Polish and packaging  | **Done**| Shell completions, `agent doctor`, README, PyPI packaging |
+| Stage | Name                  | Status      | Spec                    | Description                                              |
+|-------|-----------------------|-------------|-------------------------|----------------------------------------------------------|
+| 1     | Project scaffold      | **Done**    | `01-init.md`            | CLI skeleton with `typer`, `rich`, `pydantic`, `libtmux` |
+| 2     | Worktrunk wrapper     | **Done**    | `01-init.md`            | Python wrapper around `wt` CLI commands                  |
+| 3     | Profile system        | **Done**    | `01-init.md`            | Named profile configs for agent roles                    |
+| 4     | tmux wrapper          | **Done**    | `01-init.md`            | `libtmux` wrapper for managing panes                     |
+| 5     | Session state         | **Done**    | `01-init.md`            | Persistent session store (`sessions.json`)               |
+| 6     | Core commands         | **Done**    | `01-init.md`            | `agent new`, `agent list`, `agent kill`                  |
+| 7     | Attach and sync       | **Done**    | `01-init.md`            | `agent attach`, `agent sync`                             |
+| 8     | LangGraph orchestrator| **Done**    | `01-init.md`            | Multi-agent supervisor with LangGraph                    |
+| 9     | Polish and packaging  | **Done**    | `01-init.md`            | Shell completions, `agent doctor`, README, PyPI packaging |
+| 10    | Rename to yaam        | **Pending** | `02-rename-to-yaam.md`  | Rename package, executable, module, and config paths to `yaam` |
 
 ## Dependencies
 
@@ -127,6 +133,18 @@ README.md             # Installation, quickstart, profile authoring guide, comma
 
 Profiles live at `~/.config/agent/profiles/<name>.toml`.
 Session state lives at `~/.config/agent/sessions.json`.
+
+## Agent Skills
+
+Reusable agent instructions live in `.agents/skills/`. Each skill is a directory containing a
+`SKILL.md` with YAML frontmatter (`name`, `description`) and markdown instructions.
+
+| Skill | Description |
+|---|---|
+| `feature-spec` | How to spec and register a new feature (check docs → write spec → review → create Beads issues → sync) |
+| `create-profile` | How to create a profile TOML, write tmux/init scripts, validate, and troubleshoot |
+
+When adding a new skill, create `.agents/skills/<name>/SKILL.md` and add a row to this table.
 
 ## Session Completion Workflow
 
