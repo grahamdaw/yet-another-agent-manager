@@ -267,6 +267,66 @@ def sync(
 
 
 # ---------------------------------------------------------------------------
+# Orchestrator command
+# ---------------------------------------------------------------------------
+
+
+@app.command()
+def run(
+    goal: str = typer.Argument(help="High-level goal for the agent swarm"),
+    profile: str | None = typer.Option(
+        None, "--profile", "-p", help="Default profile for spawned agents"
+    ),
+) -> None:
+    """Run a multi-agent orchestration session for a given goal."""
+    from agent.orchestrator.graph import build_graph
+    from agent.orchestrator.models import OrchestratorState
+
+    initial_state: OrchestratorState = {
+        "goal": goal,
+        "tasks": [],
+        "agents": [],
+        "results": [],
+        "phase": "planning",
+        "error": None,
+    }
+
+    console.print(f"[cyan]Orchestrating:[/cyan] {goal}")
+    if profile:
+        console.print(f"[dim]Default profile:[/dim] {profile}")
+
+    graph = build_graph()
+
+    try:
+        with console.status("Running orchestrator..."):
+            final_state = graph.invoke(initial_state)
+    except Exception as exc:
+        console.print(f"[red]Orchestration failed:[/red] {exc}")
+        raise typer.Exit(1) from exc
+
+    results = final_state.get("results", [])
+    if not results:
+        console.print("[yellow]No results collected.[/yellow]")
+        return
+
+    table = Table(show_header=True, header_style="bold cyan")
+    table.add_column("Agent", style="bold")
+    table.add_column("Status")
+    table.add_column("Output")
+
+    for r in results:
+        colour = "green" if r["status"] == "success" else "red"
+        table.add_row(
+            r["agent_name"],
+            f"[{colour}]{r['status']}[/{colour}]",
+            r["output"][:120],
+        )
+
+    console.print(table)
+    console.print(f"[green]✓[/green] Orchestration complete — phase: {final_state.get('phase')}")
+
+
+# ---------------------------------------------------------------------------
 # Profile sub-commands
 # ---------------------------------------------------------------------------
 

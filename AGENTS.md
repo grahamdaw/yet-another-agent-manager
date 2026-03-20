@@ -76,7 +76,7 @@ The full implementation plan is in `docs/specs/01-init.md`. It defines 9 stages:
 | 5     | Session state         | **Done**| Persistent session store (`sessions.json`)               |
 | 6     | Core commands         | **Done**| `agent new`, `agent list`, `agent kill`                  |
 | 7     | Attach and sync       | **Done**| `agent attach`, `agent sync`                             |
-| 8     | LangGraph orchestrator| Pending | Multi-agent supervisor with LangGraph                    |
+| 8     | LangGraph orchestrator| **Done**| Multi-agent supervisor with LangGraph                    |
 | 9     | Polish and packaging  | Pending | Shell completions, `agent doctor`, PyPI packaging        |
 
 ## Dependencies
@@ -99,27 +99,29 @@ The full implementation plan is in `docs/specs/01-init.md`. It defines 9 stages:
 
 ```
 src/agent/
-├── __init__.py     # package root
-├── cli.py          # typer app entry point (stub commands wired up)
-├── config.py       # user config model (stub)
-├── profile.py      # AgentProfile model + loader (stub)
-├── session.py      # AgentSession model + state file (stub)
-├── tmux.py         # libtmux wrapper (stub)
-├── worktrunk.py    # wt subprocess wrapper (WorktreeInfo, WorktrunkError, create/remove/list/merge)
-├── profile.py      # AgentProfile model, load/list_profiles/validate, _ensure_example_profile
-├── tmux.py         # libtmux wrapper (PaneRef, get_or_create_session, run_setup_script, create/send/kill/alive)
-├── session.py      # AgentSession model + SessionStore (filelock, JSON state file)
-├── config.py       # AgentConfig model + load_config() (TOML, sensible defaults)
-├── init.py         # post-init script runner (InitScriptError, run())
-└── profiles/
-    └── example.toml  # bundled example profile written to ~/.config/agent/profiles/ on first run
+├── __init__.py       # package root
+├── cli.py            # typer app — new/list/kill/attach/sync/run commands
+├── config.py         # AgentConfig model + load_config() (TOML, sensible defaults)
+├── init.py           # post-init script runner (InitScriptError, run())
+├── profile.py        # AgentProfile model, load/list_profiles/validate, _ensure_example_profile
+├── session.py        # AgentSession model + SessionStore (filelock, JSON state file)
+├── tmux.py           # libtmux wrapper (PaneRef, get_or_create_session, run_setup_script, create/send/kill/alive)
+├── worktrunk.py      # wt subprocess wrapper (WorktreeInfo, WorktrunkError, create/remove/list/merge)
+├── profiles/
+│   └── example.toml  # bundled example profile written to ~/.config/agent/profiles/ on first run
+└── orchestrator/
+    ├── __init__.py   # package root
+    ├── models.py     # Task, TaskResult, OrchestratorState TypedDicts
+    ├── graph.py      # LangGraph graph (plan/dispatch/monitor/collect/review nodes)
+    └── worker.py     # worker entry point — runs task, writes results/<name>.json
 tests/
-├── test_worktrunk.py  # 19 tests with subprocess mocking
-├── test_profile.py    # 17 tests for profile load/list/validate/example
-├── test_tmux.py       # 17 tests for libtmux wrapper (fully mocked)
-├── test_session.py    # 21 tests for AgentSession, SessionStore, AgentConfig
-├── test_init.py       # 7 tests for init script runner
-└── test_cli.py        # 14 tests for agent new/list/kill via CliRunner
+├── test_worktrunk.py    # 19 tests with subprocess mocking
+├── test_profile.py      # 17 tests for profile load/list/validate/example
+├── test_tmux.py         # 17 tests for libtmux wrapper (fully mocked)
+├── test_session.py      # 21 tests for AgentSession, SessionStore, AgentConfig
+├── test_init.py         # 7 tests for init script runner
+├── test_cli.py          # 23 tests for CLI commands via CliRunner
+└── test_orchestrator.py # 19 tests for models, worker, graph nodes, and agent run command
 ```
 
 Profiles live at `~/.config/agent/profiles/<name>.toml`.
