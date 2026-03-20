@@ -14,4 +14,4 @@ env = { MY_VAR = "value" }            # extra env vars injected into the init sc
 
 [tmux]
 setup_script = "~/.config/yaam/scripts/example-tmux.sh"
-# your existing tmux layout script; called with the worktree path as $1
+# your existing tmux layout script; called with session name as $1 and worktree path as $2

@@ -57,6 +57,8 @@ docs/
   specs/
     01-init.md        # Full implementation plan (9 stages)
     02-rename-to-yaam.md  # Rename package/executable to yaam
+    03-init-before-tmux.md    # Run init script before tmux setup
+    04-tmux-script-session-arg.md  # Pass session name as $1 to tmux setup script
 .agents/
   skills/
     feature-spec/     # Skill: how to spec and register a new feature
@@ -84,6 +86,7 @@ The full implementation plan is in `docs/specs/01-init.md`. Additional specs liv
 | 8     | LangGraph orchestrator| **Done**    | `01-init.md`            | Multi-agent supervisor with LangGraph                    |
 | 9     | Polish and packaging  | **Done**    | `01-init.md`            | Shell completions, `yaam doctor`, README, `pyproject` packaging (local install)  |
 | 10    | Rename to yaam        | **Done**    | `02-rename-to-yaam.md`  | Rename package, executable, module, and config paths to `yaam` |
+| 11    | tmux script session arg | **Done**  | `04-tmux-script-session-arg.md` | Pass session name as `$1` and worktree path as `$2` to tmux setup scripts |
 
 ## Dependencies
 
@@ -111,7 +114,7 @@ src/yaam/
 ├── init.py           # post-init script runner (InitScriptError, run())
 ├── profile.py        # AgentProfile model, load/list_profiles/validate, _ensure_example_profile
 ├── session.py        # AgentSession model + SessionStore (filelock, JSON state file)
-├── tmux.py           # libtmux wrapper (PaneRef, get_or_create_session, run_setup_script, create/send/kill/alive)
+├── tmux.py           # libtmux wrapper (PaneRef, get_or_create_session, run_setup_script[$1=session,$2=worktree], create/send/kill/alive)
 ├── worktrunk.py      # wt subprocess wrapper (WorktreeInfo, WorktrunkError, create/remove/list/merge)
 ├── profiles/
 │   └── example.toml  # bundled example profile written to ~/.config/yaam/profiles/ on first run
