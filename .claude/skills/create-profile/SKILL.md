@@ -29,7 +29,6 @@ description = "Backend API agent — NestJS"    # optional but recommended
 
 [repo]
 path = "~/projects/api"                       # required; base repo wt operates in
-default_branch_prefix = "agent/"             # optional; default is "agent/"
 
 [tmux]
 setup_script = "~/.config/yaam/scripts/backend-tmux.sh"   # required
@@ -46,7 +45,6 @@ env = { NODE_ENV = "development" }                          # optional
 | `[profile]` | `name` | yes | — | Must match the `.toml` filename (without extension) |
 | `[profile]` | `description` | no | `""` | Shown in `yaam profile list` |
 | `[repo]` | `path` | yes | — | Absolute or `~`-prefixed path to the base git repo |
-| `[repo]` | `default_branch_prefix` | no | `"agent/"` | Branch names become `<prefix><session-name>` |
 | `[tmux]` | `setup_script` | yes | — | Path to the tmux layout script |
 | `[init]` | `script` | yes | — | Path to the post-init script |
 | `[init]` | `env` | no | `{}` | Extra env vars injected into the init script |
@@ -57,16 +55,7 @@ env = { NODE_ENV = "development" }                          # optional
 
 Understanding the calling convention matters when writing or debugging scripts.
 
-**tmux setup script** — called immediately after the worktree is created:
-```
-setup_script <worktree_path>
-```
-- `$1` = absolute path to the new worktree
-- Use this to build your tmux window/pane layout, `cd` into the worktree, open editors, etc.
-- stdout and stderr are logged to `~/.config/yaam/logs/<session-name>-setup.log`
-- Non-zero exit raises `TmuxScriptError` and halts the spawn
-
-**init script** — called after tmux setup:
+**init script** — called after worktree creation, *before* tmux setup:
 ```
 init_script <repo_path> <worktree_path>
 ```
@@ -75,7 +64,17 @@ init_script <repo_path> <worktree_path>
 - Use this to copy `.env` files, install dependencies, seed databases, start dev servers, etc.
 - All env vars from `[init] env` are merged into the subprocess environment
 - stdout and stderr are logged to `~/.config/yaam/logs/<session-name>-init.log`
-- Non-zero exit raises `InitScriptError` and halts the spawn (worktree and pane are cleaned up)
+- Non-zero exit raises `InitScriptError` and halts the spawn (worktree is cleaned up; no pane yet)
+
+**tmux setup script** — called after the init script, once the worktree is fully ready:
+```
+setup_script <session_name> <worktree_path>
+```
+- `$1` = tmux session name
+- `$2` = absolute path to the new worktree
+- Use this to build your tmux window/pane layout, `cd` into the worktree, open editors, etc.
+- stdout and stderr are logged to `~/.config/yaam/logs/<session-name>-setup.log`
+- Non-zero exit raises `TmuxScriptError` and halts the spawn
 
 Both scripts must be **executable** (`chmod +x`). The tool checks this at validation time and
 raises an error if a script exists but isn't executable.
@@ -96,13 +95,14 @@ mkdir -p ~/.config/yaam/scripts
 #!/usr/bin/env bash
 # ~/.config/yaam/scripts/backend-tmux.sh
 set -euo pipefail
-WORKTREE="$1"
+SESSION="$1"
+WORKTREE="$2"
 
 # Example: one editor pane, one shell pane
-tmux rename-window "backend"
-tmux send-keys "cd $WORKTREE && nvim ." Enter
-tmux split-window -v -p 30
-tmux send-keys "cd $WORKTREE" Enter
+tmux rename-window -t "$SESSION" "backend"
+tmux send-keys -t "$SESSION" "cd $WORKTREE && nvim ." Enter
+tmux split-window -t "$SESSION" -v -p 30
+tmux send-keys -t "$SESSION" "cd $WORKTREE" Enter
 ```
 
 Make it executable:
@@ -142,7 +142,6 @@ description = "Backend API agent"
 
 [repo]
 path = "~/projects/api"
-default_branch_prefix = "agent/"
 
 [tmux]
 setup_script = "~/.config/yaam/scripts/backend-tmux.sh"
@@ -177,13 +176,14 @@ yaam profile list
 ## Common patterns
 
 **Monorepo with multiple agent roles** — create one profile per role, each pointing to the same
-`repo.path` but with different scripts and branch prefixes:
+`repo.path` but with different scripts. Branch names come directly from the session name passed
+to `yaam new`, so use descriptive session names to keep branches organised:
 
 ```
 ~/.config/yaam/profiles/
-├── backend.toml    # default_branch_prefix = "agent/be/"
-├── frontend.toml   # default_branch_prefix = "agent/fe/"
-└── docs.toml       # default_branch_prefix = "agent/docs/"
+├── backend.toml    # yaam new be-my-feature --profile backend  → branch: be-my-feature
+├── frontend.toml   # yaam new fe-my-feature --profile frontend → branch: fe-my-feature
+└── docs.toml       # yaam new docs-update   --profile docs     → branch: docs-update
 ```
 
 **Shared init logic** — if multiple profiles share setup steps, extract them into a shared
@@ -198,7 +198,9 @@ can be minimal:
 
 ```bash
 #!/usr/bin/env bash
-tmux send-keys "cd $1" Enter
+SESSION="$1"
+WORKTREE="$2"
+tmux send-keys -t "$SESSION" "cd $WORKTREE" Enter
 ```
 
 ---

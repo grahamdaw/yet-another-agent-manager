@@ -68,7 +68,6 @@ description = "Backend API agent"
 
 [repo]
 path = "~/projects/api"
-default_branch_prefix = "agent/"
 
 [tmux]
 setup_script = "~/.config/yaam/scripts/backend-tmux.sh"
@@ -91,7 +90,7 @@ yaam new my-feature --profile backend
 ```
 
 This will:
-1. Create a git worktree on branch `agent/my-feature`
+1. Create a git worktree on branch `my-feature`
 2. Run your init script (install deps, copy `.env`, etc.)
 3. Run your tmux setup script to build the layout
 4. Save session state

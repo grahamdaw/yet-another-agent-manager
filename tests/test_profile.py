@@ -28,7 +28,6 @@ description = "Test profile"
 
 [repo]
 path = "/fake/repo"
-default_branch_prefix = "agent/"
 
 [tmux]
 setup_script = "/fake/scripts/tmux.sh"
@@ -50,7 +49,6 @@ def _make_profile(**kwargs) -> AgentProfile:
         name="test",
         description="desc",
         repo_path=Path("/fake/repo"),
-        default_branch_prefix="agent/",
         tmux_setup_script=Path("/fake/scripts/tmux.sh"),
         init_script=Path("/fake/scripts/init.sh"),
         init_env={"FOO": "bar"},
@@ -71,7 +69,6 @@ def test_load_returns_profile(tmp_path):
     assert p.name == "test"
     assert p.description == "Test profile"
     assert p.repo_path == Path("/fake/repo")
-    assert p.default_branch_prefix == "agent/"
     assert p.tmux_setup_script == Path("/fake/scripts/tmux.sh")
     assert p.init_script == Path("/fake/scripts/init.sh")
     assert p.init_env == {"FOO": "bar"}
@@ -91,14 +88,6 @@ def test_load_expands_home(tmp_path):
     with patch("yaam.profile._profiles_dir", return_value=tmp_path):
         p = load("home")
     assert not str(p.repo_path).startswith("~")
-
-
-def test_load_defaults_branch_prefix(tmp_path):
-    content = MINIMAL_TOML.replace('default_branch_prefix = "agent/"', "")
-    _write_profile(tmp_path, "noprefix", content)
-    with patch("yaam.profile._profiles_dir", return_value=tmp_path):
-        p = load("noprefix")
-    assert p.default_branch_prefix == "agent/"
 
 
 def test_load_defaults_empty_env(tmp_path):

@@ -41,7 +41,6 @@ class AgentProfile(BaseModel):
     name: str
     description: str = ""
     repo_path: Path
-    default_branch_prefix: str = "agent/"
     tmux_setup_script: Path
     init_script: Path
     init_env: dict[str, str] = Field(default_factory=dict)
@@ -54,7 +53,6 @@ def _parse_toml(path: Path) -> AgentProfile:
         name=data["profile"]["name"],
         description=data["profile"].get("description", ""),
         repo_path=Path(data["repo"]["path"]).expanduser(),
-        default_branch_prefix=data["repo"].get("default_branch_prefix", "agent/"),
         tmux_setup_script=Path(data["tmux"]["setup_script"]).expanduser(),
         init_script=Path(data["init"]["script"]).expanduser(),
         init_env=data["init"].get("env", {}),
