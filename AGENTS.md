@@ -77,7 +77,7 @@ The full implementation plan is in `docs/specs/01-init.md`. It defines 9 stages:
 | 6     | Core commands         | **Done**| `agent new`, `agent list`, `agent kill`                  |
 | 7     | Attach and sync       | **Done**| `agent attach`, `agent sync`                             |
 | 8     | LangGraph orchestrator| **Done**| Multi-agent supervisor with LangGraph                    |
-| 9     | Polish and packaging  | Pending | Shell completions, `agent doctor`, PyPI packaging        |
+| 9     | Polish and packaging  | **Done**| Shell completions, `agent doctor`, README, PyPI packaging |
 
 ## Dependencies
 
@@ -100,7 +100,7 @@ The full implementation plan is in `docs/specs/01-init.md`. It defines 9 stages:
 ```
 src/agent/
 ├── __init__.py       # package root
-├── cli.py            # typer app — new/list/kill/attach/sync/run commands
+├── cli.py            # typer app — new/list/kill/attach/sync/run/doctor commands
 ├── config.py         # AgentConfig model + load_config() (TOML, sensible defaults)
 ├── init.py           # post-init script runner (InitScriptError, run())
 ├── profile.py        # AgentProfile model, load/list_profiles/validate, _ensure_example_profile
@@ -120,8 +120,9 @@ tests/
 ├── test_tmux.py         # 17 tests for libtmux wrapper (fully mocked)
 ├── test_session.py      # 21 tests for AgentSession, SessionStore, AgentConfig
 ├── test_init.py         # 7 tests for init script runner
-├── test_cli.py          # 23 tests for CLI commands via CliRunner
+├── test_cli.py          # 25 tests for CLI commands via CliRunner (incl. doctor)
 └── test_orchestrator.py # 19 tests for models, worker, graph nodes, and agent run command
+README.md             # Installation, quickstart, profile authoring guide, commands reference
 ```
 
 Profiles live at `~/.config/agent/profiles/<name>.toml`.

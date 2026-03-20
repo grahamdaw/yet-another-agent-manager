@@ -368,3 +368,42 @@ def test_kill_removes_from_store():
         runner.invoke(app, ["kill", "foo"])
 
     mock_store_cls.return_value.remove.assert_called_once_with("foo")
+
+
+# ---------------------------------------------------------------------------
+# agent doctor
+# ---------------------------------------------------------------------------
+
+
+def test_doctor_all_ok():
+    with (
+        patch("shutil.which", return_value="/usr/bin/wt"),
+        patch("libtmux.Server") as mock_server_cls,
+        patch("agent.cli.config_mod.load_config", return_value=_cfg()),
+        patch("agent.cli.profile_mod._ensure_example_profile"),
+        patch("agent.cli.profile_mod.list_profiles", return_value=[_profile()]),
+        patch("agent.cli.profile_mod.validate", return_value=[]),
+    ):
+        mock_server_cls.return_value.sessions = []
+        result = runner.invoke(app, ["doctor"])
+
+    assert result.exit_code == 0
+    assert "All checks passed" in result.output
+
+
+def test_doctor_fails_without_wt():
+    def _which(cmd):
+        return None if cmd == "wt" else "/usr/bin/tmux"
+
+    with (
+        patch("shutil.which", side_effect=_which),
+        patch("libtmux.Server") as mock_server_cls,
+        patch("agent.cli.config_mod.load_config", return_value=_cfg()),
+        patch("agent.cli.profile_mod._ensure_example_profile"),
+        patch("agent.cli.profile_mod.list_profiles", return_value=[]),
+        patch("agent.cli.profile_mod.validate", return_value=[]),
+    ):
+        mock_server_cls.return_value.sessions = []
+        result = runner.invoke(app, ["doctor"])
+
+    assert result.exit_code == 1

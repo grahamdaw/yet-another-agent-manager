@@ -19,6 +19,7 @@ dependencies = [
 
 [project.scripts]
 agent = "agent.cli:app"
+agent-worker = "agent.orchestrator.worker:main"
 
 [build-system]
 requires = ["hatchling"]

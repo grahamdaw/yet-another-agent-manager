@@ -327,6 +327,77 @@ def run(
 
 
 # ---------------------------------------------------------------------------
+# Doctor command
+# ---------------------------------------------------------------------------
+
+
+@app.command()
+def doctor() -> None:
+    """Check that all required tools and configuration are in place."""
+    import shutil
+
+    import libtmux
+
+    all_ok = True
+
+    def _check(label: str, ok: bool, detail: str = "") -> None:
+        nonlocal all_ok
+        if ok:
+            console.print(f"  [green]✓[/green] {label}")
+        else:
+            console.print(f"  [red]✗[/red] {label}" + (f" — {detail}" if detail else ""))
+            all_ok = False
+
+    console.print("[bold]Checking environment...[/bold]\n")
+
+    # wt (Worktrunk) available?
+    _check("wt (Worktrunk) installed", shutil.which("wt") is not None, "run: brew install wt")
+
+    # tmux available?
+    _check("tmux installed", shutil.which("tmux") is not None, "run: brew install tmux")
+
+    # tmux server reachable?
+    try:
+        server = libtmux.Server()
+        server.sessions  # noqa: B018  # triggers connection; AttributeError if not running
+        tmux_ok = True
+    except Exception:
+        tmux_ok = False
+    _check("tmux server running", tmux_ok, "start tmux first")
+
+    # Config loads without error?
+    try:
+        cfg = config_mod.load_config()
+        config_ok = True
+        config_detail = f"tmux session: '{cfg.tmux_session_name}'"
+    except Exception as exc:
+        config_ok = False
+        config_detail = str(exc)
+    _check("config loads cleanly", config_ok, config_detail)
+
+    # At least one valid profile?
+    profile_mod._ensure_example_profile()
+    profiles = profile_mod.list_profiles()
+    valid_profiles = []
+    for p in profiles:
+        issues = profile_mod.validate(p)
+        if not issues:
+            valid_profiles.append(p.name)
+    _check(
+        f"at least one valid profile ({len(valid_profiles)}/{len(profiles)} valid)",
+        bool(valid_profiles),
+        "run: agent profile validate <name>",
+    )
+
+    console.print()
+    if all_ok:
+        console.print("[bold green]All checks passed.[/bold green]")
+    else:
+        console.print("[bold red]Some checks failed.[/bold red] Fix the issues above and re-run.")
+        raise typer.Exit(1)
+
+
+# ---------------------------------------------------------------------------
 # Profile sub-commands
 # ---------------------------------------------------------------------------
 
