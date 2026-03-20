@@ -36,7 +36,7 @@ When making changes:
 
 ## Project Overview
 
-**yaam (Yet Another Agent Manager)** — A Python CLI tool that manages tmux sessions and git worktrees (via Worktrunk), with a path to multi-agent orchestration via LangGraph.
+**yaam (Yet Another Agent Manager)** — A Python CLI tool that manages tmux sessions and git worktrees (via Worktrunk), with a path to multi-agent orchestration via LangGraph. It is **distributed as a clone-and-install** project (see README): install from the repository root with `uv tool install .` or `pip install .`, not from PyPI.
 
 Agent sessions are driven by **profiles** — named configurations that bundle a base repository, a tmux layout script, and a post-init script. Spawning an agent with a profile fully automates the environment setup for that agent role.
 
@@ -82,7 +82,7 @@ The full implementation plan is in `docs/specs/01-init.md`. Additional specs liv
 | 6     | Core commands         | **Done**    | `01-init.md`            | `yaam new`, `yaam list`, `yaam kill`                     |
 | 7     | Attach and sync       | **Done**    | `01-init.md`            | `yaam attach`, `yaam sync`                               |
 | 8     | LangGraph orchestrator| **Done**    | `01-init.md`            | Multi-agent supervisor with LangGraph                    |
-| 9     | Polish and packaging  | **Done**    | `01-init.md`            | Shell completions, `yaam doctor`, README, PyPI packaging  |
+| 9     | Polish and packaging  | **Done**    | `01-init.md`            | Shell completions, `yaam doctor`, README, `pyproject` packaging (local install)  |
 | 10    | Rename to yaam        | **Done**    | `02-rename-to-yaam.md`  | Rename package, executable, module, and config paths to `yaam` |
 
 ## Dependencies
@@ -128,7 +128,7 @@ tests/
 ├── test_init.py         # 7 tests for init script runner
 ├── test_cli.py          # 25 tests for CLI commands via CliRunner (incl. doctor)
 └── test_orchestrator.py # 19 tests for models, worker, graph nodes, and agent run command
-README.md             # Installation, quickstart, profile authoring guide, commands reference
+README.md             # Clone-and-install, quickstart, profile authoring guide, commands reference
 ```
 
 Profiles live at `~/.config/yaam/profiles/<name>.toml`.
@@ -142,7 +142,7 @@ Reusable agent instructions live in `.agents/skills/`. Each skill is a directory
 | Skill | Description |
 |---|---|
 | `feature-spec` | How to spec and register a new feature (check docs → write spec → review → create Beads issues → sync) |
-| `create-profile` | How to create a profile TOML, write tmux/init scripts, validate, and troubleshoot |
+| `create-profile` | How to create a profile TOML, write tmux/init scripts, validate, and troubleshoot. Use this skill (invoke with `/create-profile`) when creating or configuring a new agent profile. |
 
 When adding a new skill, create `.agents/skills/<name>/SKILL.md` and add a row to this table.
 

@@ -2,6 +2,8 @@
 
 A Python CLI tool that manages **tmux sessions** and **git worktrees** (via [Worktrunk](https://github.com/grahamdaw/worktrunk)) for multi-agent software engineering workflows, with built-in multi-agent orchestration via [LangGraph](https://github.com/langchain-ai/langgraph).
 
+**Distribution:** yaam is meant to be **cloned and installed from your local checkout**. There is no supported PyPI-first workflow; treat this repo as the source of truth and upgrade by pulling.
+
 ## Features
 
 - Spawn isolated agent sessions — each gets its own git worktree and tmux pane
@@ -16,21 +18,38 @@ A Python CLI tool that manages **tmux sessions** and **git worktrees** (via [Wor
 - [tmux](https://github.com/tmux/tmux)
 - [Worktrunk (`wt`)](https://github.com/grahamdaw/worktrunk) — git worktree manager
 
-Check all requirements are met:
+## Installation
+
+Clone the repository, then install from the project root:
+
+```bash
+git clone https://github.com/grahamdaw/yet-another-agent-manager.git
+cd yet-another-agent-manager
+```
+
+**Recommended — isolated tool environment with [uv](https://docs.astral.sh/uv/):**
+
+```bash
+uv tool install .
+```
+
+This puts `yaam` and `yaam-worker` on your PATH without polluting a global Python environment. Re-run `uv tool install .` after `git pull` to pick up changes.
+
+**Alternative — pip in the current environment:**
+
+```bash
+pip install .
+# editable, for active development on yaam itself:
+pip install -e .
+```
+
+**Verify the install:**
 
 ```bash
 yaam doctor
 ```
 
-## Installation
-
-```bash
-pip install yaam
-# or with uv:
-uv tool install yaam
-```
-
-Install shell completions (one-time):
+**Shell completions** (one-time):
 
 ```bash
 yaam --install-completion
@@ -98,6 +117,9 @@ The supervisor (Claude claude-haiku-4-5-20251001) breaks the goal into tasks, sp
 monitors progress, collects results, and reviews completion automatically.
 
 ## Profile authoring guide
+
+> **Tip:** If you are using Claude Code, there is a built-in skill to guide you through profile creation. Run `/create-profile` in a Claude Code session and it will walk you through writing the TOML, tmux setup script, and init script step by step.
+
 
 A profile bundles three things:
 

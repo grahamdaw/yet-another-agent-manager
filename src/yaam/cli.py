@@ -351,7 +351,7 @@ def doctor() -> None:
     console.print("[bold]Checking environment...[/bold]\n")
 
     # wt (Worktrunk) available?
-    _check("wt (Worktrunk) installed", shutil.which("wt") is not None, "run: brew install wt")
+    _check("wt (Worktrunk) installed", shutil.which("wt") is not None, "run: brew install worktrunk")
 
     # tmux available?
     _check("tmux installed", shutil.which("tmux") is not None, "run: brew install tmux")
