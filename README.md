@@ -126,7 +126,7 @@ A profile bundles three things:
 | Field | Description |
 |---|---|
 | `repo.path` | Absolute path to the base git repo Worktrunk operates in |
-| `tmux.setup_script` | Script that builds your tmux layout; receives the worktree path as `$1` |
+| `tmux.setup_script` | Script that builds your tmux layout; receives session name as `$1` and worktree path as `$2` |
 | `init.script` | Runs after worktree setup, before tmux; receives `repo_path $1` and `worktree_path $2` |
 
 The `init.script` is responsible for anything needed to make the worktree ready to work in:
