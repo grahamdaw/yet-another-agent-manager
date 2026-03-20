@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, field_serializer, field_validator
 
 from yaam.tmux import PaneRef
 
-STATE_FILE = Path("~/.config/agent/sessions.json")
+STATE_FILE = Path("~/.config/yaam/sessions.json")
 
 
 class AgentSession(BaseModel):

@@ -409,7 +409,7 @@ def profile_list() -> None:
     profiles = profile_mod.list_profiles()
     if not profiles:
         console.print(
-            "[yellow]No profiles found.[/yellow] Add a .toml file to ~/.config/agent/profiles/"
+            "[yellow]No profiles found.[/yellow] Add a .toml file to ~/.config/yaam/profiles/"
         )
         return
     table = Table(title="Agent Profiles", show_header=True, header_style="bold cyan")

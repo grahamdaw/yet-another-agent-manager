@@ -4,7 +4,7 @@ import os
 import subprocess
 from pathlib import Path
 
-LOGS_DIR = Path("~/.config/agent/logs")
+LOGS_DIR = Path("~/.config/yaam/logs")
 
 
 class InitScriptError(RuntimeError):
@@ -23,7 +23,7 @@ def run(
     Calls ``script_path repo_path worktree_path`` as a subprocess.
     Merges *env* with the current process environment.  Full output
     (stdout + stderr combined) is logged to
-    ``~/.config/agent/logs/<session_name>-init.log``.
+    ``~/.config/yaam/logs/<session_name>-init.log``.
     Raises InitScriptError on non-zero exit.
     """
     logs_dir = LOGS_DIR.expanduser()
