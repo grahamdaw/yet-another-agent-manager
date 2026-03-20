@@ -7,17 +7,17 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from agent import config as config_mod
-from agent import init as init_mod
-from agent import profile as profile_mod
-from agent import tmux as tmux_mod
-from agent import worktrunk
-from agent.init import InitScriptError  # noqa: F401 (re-exported for callers)
-from agent.profile import ProfileValidationError
-from agent.session import AgentSession, SessionStore
+from yaam import config as config_mod
+from yaam import init as init_mod
+from yaam import profile as profile_mod
+from yaam import tmux as tmux_mod
+from yaam import worktrunk
+from yaam.init import InitScriptError  # noqa: F401 (re-exported for callers)
+from yaam.profile import ProfileValidationError
+from yaam.session import AgentSession, SessionStore
 
 app = typer.Typer(
-    name="agent",
+    name="yaam",
     help="Manage tmux sessions and git worktrees for multi-agent orchestration.",
     no_args_is_help=True,
 )
@@ -138,7 +138,7 @@ def list_sessions(
 
     if not sessions:
         console.print(
-            "[yellow]No active sessions.[/yellow] Use [bold]agent new[/bold] to spawn one."
+            "[yellow]No active sessions.[/yellow] Use [bold]yaam new[/bold] to spawn one."
         )
         return
 
@@ -200,7 +200,7 @@ def attach(name: str = typer.Argument(help="Name of the agent session to attach 
 
     if not tmux_mod.pane_alive(session.tmux_pane_ref):
         console.print(
-            f"[red]Error:[/red] Pane for '{name}' is dead. Run [bold]agent sync --fix[/bold]."
+            f"[red]Error:[/red] Pane for '{name}' is dead. Run [bold]yaam sync --fix[/bold]."
         )
         raise typer.Exit(1)
 
@@ -279,8 +279,8 @@ def run(
     ),
 ) -> None:
     """Run a multi-agent orchestration session for a given goal."""
-    from agent.orchestrator.graph import build_graph
-    from agent.orchestrator.models import OrchestratorState
+    from yaam.orchestrator.graph import build_graph
+    from yaam.orchestrator.models import OrchestratorState
 
     initial_state: OrchestratorState = {
         "goal": goal,
@@ -386,7 +386,7 @@ def doctor() -> None:
     _check(
         f"at least one valid profile ({len(valid_profiles)}/{len(profiles)} valid)",
         bool(valid_profiles),
-        "run: agent profile validate <name>",
+        "run: yaam profile validate <name>",
     )
 
     console.print()
@@ -409,7 +409,7 @@ def profile_list() -> None:
     profiles = profile_mod.list_profiles()
     if not profiles:
         console.print(
-            "[yellow]No profiles found.[/yellow] Add a .toml file to ~/.config/agent/profiles/"
+            "[yellow]No profiles found.[/yellow] Add a .toml file to ~/.config/yaam/profiles/"
         )
         return
     table = Table(title="Agent Profiles", show_header=True, header_style="bold cyan")

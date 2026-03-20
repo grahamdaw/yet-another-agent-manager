@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from agent.worktrunk import (
+from yaam.worktrunk import (
     WorktreeInfo,
     WorktrunkError,
     WorktrunkNotFoundError,
@@ -58,7 +58,7 @@ def test_wt_available_false():
 @pytest.fixture()
 def no_wt():
     """Patch shutil.which to simulate wt not being installed."""
-    with patch("agent.worktrunk.wt_available", return_value=False):
+    with patch("yaam.worktrunk.wt_available", return_value=False):
         yield
 
 
@@ -90,7 +90,7 @@ def test_merge_raises_when_wt_missing(no_wt):
 @pytest.fixture()
 def has_wt():
     """Patch shutil.which to simulate wt being installed."""
-    with patch("agent.worktrunk.wt_available", return_value=True):
+    with patch("yaam.worktrunk.wt_available", return_value=True):
         yield
 
 

@@ -17,7 +17,7 @@ class ProfileValidationError(RuntimeError):
     """Raised when a profile fails validation (e.g. non-executable script)."""
 
 
-PROFILES_DIR = Path("~/.config/agent/profiles")
+PROFILES_DIR = Path("~/.config/yaam/profiles")
 
 
 def _profiles_dir() -> Path:
@@ -31,7 +31,7 @@ def _ensure_example_profile() -> None:
     if any(d.glob("*.toml")):
         return
     example_dest = d / "example.toml"
-    ref = importlib.resources.files("agent.profiles").joinpath("example.toml")
+    ref = importlib.resources.files("yaam.profiles").joinpath("example.toml")
     example_dest.write_text(ref.read_text(encoding="utf-8"), encoding="utf-8")
 
 
@@ -64,7 +64,7 @@ def _parse_toml(path: Path) -> AgentProfile:
 def load(name: str) -> AgentProfile:
     """Load and return the profile named *name*.
 
-    Reads ``~/.config/agent/profiles/<name>.toml``.
+    Reads ``~/.config/yaam/profiles/<name>.toml``.
     Raises ProfileNotFoundError if the file does not exist.
     Raises pydantic.ValidationError if required fields are missing.
     """

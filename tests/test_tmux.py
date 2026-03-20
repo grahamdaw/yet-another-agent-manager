@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from agent.tmux import (
+from yaam.tmux import (
     PaneRef,
     TmuxScriptError,
     create_pane,
@@ -73,7 +73,7 @@ def test_get_or_create_session_creates_new():
     new_session = _fake_session()
     server.new_session.return_value = new_session
 
-    with patch("agent.tmux._server", return_value=server):
+    with patch("yaam.tmux._server", return_value=server):
         result = get_or_create_session(SESSION)
 
     server.has_session.assert_called_once_with(SESSION)
@@ -85,7 +85,7 @@ def test_get_or_create_session_returns_existing():
     existing = _fake_session()
     server = _fake_server(has_session=True, session=existing)
 
-    with patch("agent.tmux._server", return_value=server):
+    with patch("yaam.tmux._server", return_value=server):
         result = get_or_create_session(SESSION)
 
     server.new_session.assert_not_called()
@@ -98,7 +98,7 @@ def test_get_or_create_session_creates_if_find_where_returns_none():
     new_session = _fake_session()
     server.new_session.return_value = new_session
 
-    with patch("agent.tmux._server", return_value=server):
+    with patch("yaam.tmux._server", return_value=server):
         result = get_or_create_session(SESSION)
 
     server.new_session.assert_called_once_with(session_name=SESSION)
@@ -129,7 +129,7 @@ def test_run_setup_script_success(tmp_path):
 def test_run_setup_script_writes_log(tmp_path):
     with (
         patch("subprocess.run", return_value=_completed()),
-        patch("agent.tmux.LOGS_DIR", tmp_path),
+        patch("yaam.tmux.LOGS_DIR", tmp_path),
     ):
         run_setup_script(SCRIPT, WORKTREE, SESSION)
 
@@ -140,7 +140,7 @@ def test_run_setup_script_writes_log(tmp_path):
 def test_run_setup_script_raises_on_failure(tmp_path):
     with (
         patch("subprocess.run", return_value=_completed(returncode=1, stderr="boom")),
-        patch("agent.tmux.LOGS_DIR", tmp_path),
+        patch("yaam.tmux.LOGS_DIR", tmp_path),
         pytest.raises(TmuxScriptError, match="boom"),
     ):
         run_setup_script(SCRIPT, WORKTREE, SESSION)
@@ -149,7 +149,7 @@ def test_run_setup_script_raises_on_failure(tmp_path):
 def test_run_setup_script_log_contains_session_name(tmp_path):
     with (
         patch("subprocess.run", return_value=_completed()),
-        patch("agent.tmux.LOGS_DIR", tmp_path),
+        patch("yaam.tmux.LOGS_DIR", tmp_path),
     ):
         run_setup_script(SCRIPT, WORKTREE, "my-agent")
 
@@ -171,7 +171,7 @@ def test_create_pane_creates_new_window():
     server = _fake_server(session=session)
     server.find_where.return_value = session
 
-    with patch("agent.tmux._server", return_value=server):
+    with patch("yaam.tmux._server", return_value=server):
         ref = create_pane(SESSION, "main")
 
     session.new_window.assert_called_once_with(window_name="main")
@@ -189,7 +189,7 @@ def test_create_pane_splits_existing_window():
     server = _fake_server(session=session)
     server.find_where.return_value = session
 
-    with patch("agent.tmux._server", return_value=server):
+    with patch("yaam.tmux._server", return_value=server):
         ref = create_pane(SESSION, "main")
 
     win.split.assert_called_once()
@@ -200,7 +200,7 @@ def test_create_pane_raises_if_session_missing():
     server = _fake_server(session=None)
 
     with (
-        patch("agent.tmux._server", return_value=server),
+        patch("yaam.tmux._server", return_value=server),
         pytest.raises(ValueError, match="not found"),
     ):
         create_pane(SESSION, "main")
@@ -215,7 +215,7 @@ def test_send_keys_calls_pane():
     pane = _fake_pane()
     server = _fake_server(pane=pane)
 
-    with patch("agent.tmux._server", return_value=server):
+    with patch("yaam.tmux._server", return_value=server):
         send_keys(_pane_ref(), "ls -la")
 
     pane.send_keys.assert_called_once_with("ls -la")
@@ -225,7 +225,7 @@ def test_send_keys_raises_if_pane_dead():
     server = _fake_server(pane=None)
 
     with (
-        patch("agent.tmux._server", return_value=server),
+        patch("yaam.tmux._server", return_value=server),
         pytest.raises(ValueError, match="not found"),
     ):
         send_keys(_pane_ref(), "ls")
@@ -240,7 +240,7 @@ def test_kill_pane_kills_live_pane():
     pane = _fake_pane()
     server = _fake_server(pane=pane)
 
-    with patch("agent.tmux._server", return_value=server):
+    with patch("yaam.tmux._server", return_value=server):
         kill_pane(_pane_ref())
 
     pane.kill.assert_called_once()
@@ -250,7 +250,7 @@ def test_kill_pane_idempotent_when_dead():
     """Calling kill_pane on an already-dead pane must not raise."""
     server = _fake_server(pane=None)
 
-    with patch("agent.tmux._server", return_value=server):
+    with patch("yaam.tmux._server", return_value=server):
         kill_pane(_pane_ref())  # should not raise
 
 
@@ -263,14 +263,14 @@ def test_pane_alive_true():
     pane = _fake_pane()
     server = _fake_server(pane=pane)
 
-    with patch("agent.tmux._server", return_value=server):
+    with patch("yaam.tmux._server", return_value=server):
         assert pane_alive(_pane_ref()) is True
 
 
 def test_pane_alive_false():
     server = _fake_server(pane=None)
 
-    with patch("agent.tmux._server", return_value=server):
+    with patch("yaam.tmux._server", return_value=server):
         assert pane_alive(_pane_ref()) is False
 
 
@@ -280,8 +280,8 @@ def test_pane_alive_false_after_kill():
     # First call (kill) finds the pane; second call (alive check) returns None
     server.panes.get.side_effect = [pane, None]
 
-    with patch("agent.tmux._server", return_value=server):
+    with patch("yaam.tmux._server", return_value=server):
         kill_pane(_pane_ref())
 
-    with patch("agent.tmux._server", return_value=server):
+    with patch("yaam.tmux._server", return_value=server):
         assert pane_alive(_pane_ref()) is False

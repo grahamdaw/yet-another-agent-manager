@@ -46,9 +46,9 @@ def run(session_name: str, results_dir: Path) -> None:
 
 
 def main() -> None:
-    """CLI entry point: ``agent-worker <session_name> [results_dir]``."""
+    """CLI entry point: ``yaam-worker <session_name> [results_dir]``."""
     if len(sys.argv) < 2:
-        print("Usage: agent-worker <session_name> [results_dir]", file=sys.stderr)
+        print("Usage: yaam-worker <session_name> [results_dir]", file=sys.stderr)
         sys.exit(1)
 
     session_name = sys.argv[1]

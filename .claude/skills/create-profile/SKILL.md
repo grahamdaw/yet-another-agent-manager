@@ -13,10 +13,10 @@ description: >
 
 Profiles are the central configuration unit in this tool. Each profile defines a named agent
 role — its git repo, tmux layout, and init sequence. When you spawn an agent with
-`agent new <name> --profile <profile>`, everything is driven by the profile: which repo to
+`yaam new <name> --profile <profile>`, everything is driven by the profile: which repo to
 branch from, how to arrange the terminal, and what to run to make the worktree ready.
 
-A profile is a TOML file at `~/.config/agent/profiles/<name>.toml`.
+A profile is a TOML file at `~/.config/yaam/profiles/<name>.toml`.
 
 ---
 
@@ -32,10 +32,10 @@ path = "~/projects/api"                       # required; base repo wt operates 
 default_branch_prefix = "agent/"             # optional; default is "agent/"
 
 [tmux]
-setup_script = "~/.config/agent/scripts/backend-tmux.sh"   # required
+setup_script = "~/.config/yaam/scripts/backend-tmux.sh"   # required
 
 [init]
-script = "~/.config/agent/scripts/backend-init.sh"         # required
+script = "~/.config/yaam/scripts/backend-init.sh"         # required
 env = { NODE_ENV = "development" }                          # optional
 ```
 
@@ -44,7 +44,7 @@ env = { NODE_ENV = "development" }                          # optional
 | Section | Key | Required | Default | Notes |
 |---|---|---|---|---|
 | `[profile]` | `name` | yes | — | Must match the `.toml` filename (without extension) |
-| `[profile]` | `description` | no | `""` | Shown in `agent profile list` |
+| `[profile]` | `description` | no | `""` | Shown in `yaam profile list` |
 | `[repo]` | `path` | yes | — | Absolute or `~`-prefixed path to the base git repo |
 | `[repo]` | `default_branch_prefix` | no | `"agent/"` | Branch names become `<prefix><session-name>` |
 | `[tmux]` | `setup_script` | yes | — | Path to the tmux layout script |
@@ -63,7 +63,7 @@ setup_script <worktree_path>
 ```
 - `$1` = absolute path to the new worktree
 - Use this to build your tmux window/pane layout, `cd` into the worktree, open editors, etc.
-- stdout and stderr are logged to `~/.config/agent/logs/<session-name>-setup.log`
+- stdout and stderr are logged to `~/.config/yaam/logs/<session-name>-setup.log`
 - Non-zero exit raises `TmuxScriptError` and halts the spawn
 
 **init script** — called after tmux setup:
@@ -74,7 +74,7 @@ init_script <repo_path> <worktree_path>
 - `$2` = absolute path to the new worktree
 - Use this to copy `.env` files, install dependencies, seed databases, start dev servers, etc.
 - All env vars from `[init] env` are merged into the subprocess environment
-- stdout and stderr are logged to `~/.config/agent/logs/<session-name>-init.log`
+- stdout and stderr are logged to `~/.config/yaam/logs/<session-name>-init.log`
 - Non-zero exit raises `InitScriptError` and halts the spawn (worktree and pane are cleaned up)
 
 Both scripts must be **executable** (`chmod +x`). The tool checks this at validation time and
@@ -87,14 +87,14 @@ raises an error if a script exists but isn't executable.
 ### 1. Create the scripts directory
 
 ```bash
-mkdir -p ~/.config/agent/scripts
+mkdir -p ~/.config/yaam/scripts
 ```
 
 ### 2. Write the tmux setup script
 
 ```bash
 #!/usr/bin/env bash
-# ~/.config/agent/scripts/backend-tmux.sh
+# ~/.config/yaam/scripts/backend-tmux.sh
 set -euo pipefail
 WORKTREE="$1"
 
@@ -107,14 +107,14 @@ tmux send-keys "cd $WORKTREE" Enter
 
 Make it executable:
 ```bash
-chmod +x ~/.config/agent/scripts/backend-tmux.sh
+chmod +x ~/.config/yaam/scripts/backend-tmux.sh
 ```
 
 ### 3. Write the init script
 
 ```bash
 #!/usr/bin/env bash
-# ~/.config/agent/scripts/backend-init.sh
+# ~/.config/yaam/scripts/backend-init.sh
 set -euo pipefail
 REPO_PATH="$1"
 WORKTREE="$2"
@@ -129,13 +129,13 @@ npm install
 
 Make it executable:
 ```bash
-chmod +x ~/.config/agent/scripts/backend-init.sh
+chmod +x ~/.config/yaam/scripts/backend-init.sh
 ```
 
 ### 4. Write the profile TOML
 
 ```bash
-cat > ~/.config/agent/profiles/backend.toml << 'EOF'
+cat > ~/.config/yaam/profiles/backend.toml << 'EOF'
 [profile]
 name = "backend"
 description = "Backend API agent"
@@ -145,10 +145,10 @@ path = "~/projects/api"
 default_branch_prefix = "agent/"
 
 [tmux]
-setup_script = "~/.config/agent/scripts/backend-tmux.sh"
+setup_script = "~/.config/yaam/scripts/backend-tmux.sh"
 
 [init]
-script = "~/.config/agent/scripts/backend-init.sh"
+script = "~/.config/yaam/scripts/backend-init.sh"
 env = { NODE_ENV = "development" }
 EOF
 ```
@@ -156,7 +156,7 @@ EOF
 ### 5. Validate the profile
 
 ```bash
-agent profile validate backend
+yaam profile validate backend
 ```
 
 This checks:
@@ -169,7 +169,7 @@ Fix any issues reported before attempting to spawn an agent.
 ### 6. Verify it appears in the list
 
 ```bash
-agent profile list
+yaam profile list
 ```
 
 ---
@@ -180,7 +180,7 @@ agent profile list
 `repo.path` but with different scripts and branch prefixes:
 
 ```
-~/.config/agent/profiles/
+~/.config/yaam/profiles/
 ├── backend.toml    # default_branch_prefix = "agent/be/"
 ├── frontend.toml   # default_branch_prefix = "agent/fe/"
 └── docs.toml       # default_branch_prefix = "agent/docs/"
@@ -190,7 +190,7 @@ agent profile list
 library script and `source` it from each init script:
 
 ```bash
-source ~/.config/agent/scripts/common.sh
+source ~/.config/yaam/scripts/common.sh
 ```
 
 **No tmux layout needed** — if you just want a plain shell in the worktree, the tmux script
@@ -207,8 +207,8 @@ tmux send-keys "cd $1" Enter
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `ProfileNotFoundError` | TOML filename doesn't match `name` field, or wrong directory | Ensure filename is `<name>.toml` in `~/.config/agent/profiles/` |
+| `ProfileNotFoundError` | TOML filename doesn't match `name` field, or wrong directory | Ensure filename is `<name>.toml` in `~/.config/yaam/profiles/` |
 | `ProfileValidationError: not executable` | Script exists but missing execute bit | `chmod +x <script>` |
-| `TmuxScriptError` | tmux setup script exited non-zero | Check `~/.config/agent/logs/<name>-setup.log` |
-| `InitScriptError` | init script exited non-zero | Check `~/.config/agent/logs/<name>-init.log` |
-| Profile silently missing from `agent profile list` | TOML parse error | Run `agent profile validate <name>` directly to surface the error |
+| `TmuxScriptError` | tmux setup script exited non-zero | Check `~/.config/yaam/logs/<name>-setup.log` |
+| `InitScriptError` | init script exited non-zero | Check `~/.config/yaam/logs/<name>-init.log` |
+| Profile silently missing from `yaam profile list` | TOML parse error | Run `yaam profile validate <name>` directly to surface the error |

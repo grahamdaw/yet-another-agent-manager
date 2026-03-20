@@ -6,7 +6,7 @@ from pathlib import Path
 
 import libtmux
 
-LOGS_DIR = Path("~/.config/agent/logs")
+LOGS_DIR = Path("~/.config/yaam/logs")
 
 
 class TmuxScriptError(RuntimeError):
@@ -48,7 +48,7 @@ def run_setup_script(
     """Run the profile tmux setup script, logging output to a per-session log file.
 
     Calls ``script_path worktree_path`` as a subprocess.  Stdout and stderr
-    are captured to ``~/.config/agent/logs/<session_name>-setup.log``.
+    are captured to ``~/.config/yaam/logs/<session_name>-setup.log``.
     Raises TmuxScriptError with captured stderr on non-zero exit.
     """
     logs_dir = LOGS_DIR.expanduser()

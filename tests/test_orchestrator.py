@@ -3,8 +3,8 @@
 import json
 from unittest.mock import MagicMock, patch
 
-from agent.orchestrator.models import OrchestratorState, Task, TaskResult
-from agent.orchestrator.worker import run as worker_run
+from yaam.orchestrator.models import OrchestratorState, Task, TaskResult
+from yaam.orchestrator.worker import run as worker_run
 
 # ---------------------------------------------------------------------------
 # Models
@@ -98,14 +98,14 @@ def _base_state(**overrides) -> OrchestratorState:
 
 
 def test_plan_node_parses_tasks():
-    from agent.orchestrator.graph import plan_node
+    from yaam.orchestrator.graph import plan_node
 
     mock_response = MagicMock()
     mock_response.content = json.dumps(
         [{"id": "t1", "description": "add /health route", "profile": "backend"}]
     )
 
-    with patch("agent.orchestrator.graph.ChatAnthropic") as mock_llm_cls:
+    with patch("yaam.orchestrator.graph.ChatAnthropic") as mock_llm_cls:
         mock_llm_cls.return_value.invoke.return_value = mock_response
         result = plan_node(_base_state())
 
@@ -115,12 +115,12 @@ def test_plan_node_parses_tasks():
 
 
 def test_plan_node_assigns_id_if_missing():
-    from agent.orchestrator.graph import plan_node
+    from yaam.orchestrator.graph import plan_node
 
     mock_response = MagicMock()
     mock_response.content = json.dumps([{"description": "do something", "profile": "default"}])
 
-    with patch("agent.orchestrator.graph.ChatAnthropic") as mock_llm_cls:
+    with patch("yaam.orchestrator.graph.ChatAnthropic") as mock_llm_cls:
         mock_llm_cls.return_value.invoke.return_value = mock_response
         result = plan_node(_base_state())
 
@@ -128,12 +128,12 @@ def test_plan_node_assigns_id_if_missing():
 
 
 def test_plan_node_handles_markdown_fence():
-    from agent.orchestrator.graph import plan_node
+    from yaam.orchestrator.graph import plan_node
 
     mock_response = MagicMock()
     mock_response.content = '```json\n[{"id":"t1","description":"task","profile":"backend"}]\n```'
 
-    with patch("agent.orchestrator.graph.ChatAnthropic") as mock_llm_cls:
+    with patch("yaam.orchestrator.graph.ChatAnthropic") as mock_llm_cls:
         mock_llm_cls.return_value.invoke.return_value = mock_response
         result = plan_node(_base_state())
 
@@ -141,7 +141,7 @@ def test_plan_node_handles_markdown_fence():
 
 
 def test_dispatch_node_spawns_agents():
-    from agent.orchestrator.graph import dispatch_node
+    from yaam.orchestrator.graph import dispatch_node
 
     tasks: list[Task] = [
         {"id": "t1", "description": "task one", "profile": "backend"},
@@ -158,7 +158,7 @@ def test_dispatch_node_spawns_agents():
 
 
 def test_dispatch_node_continues_on_failure():
-    from agent.orchestrator.graph import dispatch_node
+    from yaam.orchestrator.graph import dispatch_node
 
     tasks: list[Task] = [
         {"id": "t1", "description": "task one", "profile": "backend"},
@@ -178,7 +178,7 @@ def test_dispatch_node_continues_on_failure():
 
 
 def test_collect_node_reads_result_files(tmp_path):
-    from agent.orchestrator.graph import collect_node
+    from yaam.orchestrator.graph import collect_node
 
     result_data = {
         "session_name": "orch-t1",
@@ -189,7 +189,7 @@ def test_collect_node_reads_result_files(tmp_path):
 
     state = _base_state(agents=["orch-t1"])
 
-    with patch("agent.orchestrator.graph._RESULTS_DIR", tmp_path):
+    with patch("yaam.orchestrator.graph._RESULTS_DIR", tmp_path):
         result = collect_node(state)
 
     assert result["results"][0]["status"] == "success"
@@ -197,18 +197,18 @@ def test_collect_node_reads_result_files(tmp_path):
 
 
 def test_collect_node_marks_timeout_for_missing_file(tmp_path):
-    from agent.orchestrator.graph import collect_node
+    from yaam.orchestrator.graph import collect_node
 
     state = _base_state(agents=["orch-missing"])
 
-    with patch("agent.orchestrator.graph._RESULTS_DIR", tmp_path):
+    with patch("yaam.orchestrator.graph._RESULTS_DIR", tmp_path):
         result = collect_node(state)
 
     assert result["results"][0]["status"] == "timeout"
 
 
 def test_review_node_returns_done():
-    from agent.orchestrator.graph import review_node
+    from yaam.orchestrator.graph import review_node
 
     mock_response = MagicMock()
     mock_response.content = "DONE"
@@ -218,7 +218,7 @@ def test_review_node_returns_done():
     ]
     state = _base_state(results=results, phase="reviewing")
 
-    with patch("agent.orchestrator.graph.ChatAnthropic") as mock_llm_cls:
+    with patch("yaam.orchestrator.graph.ChatAnthropic") as mock_llm_cls:
         mock_llm_cls.return_value.invoke.return_value = mock_response
         result = review_node(state)
 
@@ -226,7 +226,7 @@ def test_review_node_returns_done():
 
 
 def test_review_node_returns_retry():
-    from agent.orchestrator.graph import review_node
+    from yaam.orchestrator.graph import review_node
 
     mock_response = MagicMock()
     mock_response.content = "RETRY"
@@ -236,7 +236,7 @@ def test_review_node_returns_retry():
     ]
     state = _base_state(results=results, phase="reviewing")
 
-    with patch("agent.orchestrator.graph.ChatAnthropic") as mock_llm_cls:
+    with patch("yaam.orchestrator.graph.ChatAnthropic") as mock_llm_cls:
         mock_llm_cls.return_value.invoke.return_value = mock_response
         result = review_node(state)
 
@@ -244,7 +244,7 @@ def test_review_node_returns_retry():
 
 
 def test_build_graph_returns_compiled():
-    from agent.orchestrator.graph import build_graph
+    from yaam.orchestrator.graph import build_graph
 
     graph = build_graph()
     assert graph is not None
@@ -258,7 +258,7 @@ def test_build_graph_returns_compiled():
 def test_run_command_happy_path():
     from typer.testing import CliRunner
 
-    from agent.cli import app
+    from yaam.cli import app
 
     runner = CliRunner()
 
@@ -281,7 +281,7 @@ def test_run_command_happy_path():
     mock_graph = MagicMock()
     mock_graph.invoke.return_value = final_state
 
-    with patch("agent.orchestrator.graph.build_graph", return_value=mock_graph):
+    with patch("yaam.orchestrator.graph.build_graph", return_value=mock_graph):
         result = runner.invoke(app, ["run", "add health check"])
 
     assert result.exit_code == 0
@@ -291,14 +291,14 @@ def test_run_command_happy_path():
 def test_run_command_handles_graph_error():
     from typer.testing import CliRunner
 
-    from agent.cli import app
+    from yaam.cli import app
 
     runner = CliRunner()
 
     mock_graph = MagicMock()
     mock_graph.invoke.side_effect = RuntimeError("graph exploded")
 
-    with patch("agent.orchestrator.graph.build_graph", return_value=mock_graph):
+    with patch("yaam.orchestrator.graph.build_graph", return_value=mock_graph):
         result = runner.invoke(app, ["run", "add health check"])
 
     assert result.exit_code == 1

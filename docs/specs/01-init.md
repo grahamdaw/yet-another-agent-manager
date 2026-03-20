@@ -1,4 +1,4 @@
-# Agent CLI — Implementation Plan
+# yaam — Implementation Plan
 
 A staged plan for building a Python CLI tool that manages tmux sessions and git worktrees (via Worktrunk), with a path to multi-agent orchestration via LangGraph.
 
@@ -16,7 +16,7 @@ Agent sessions are driven by **profiles** — named configurations that bundle t
 - Add dependencies via `uv add`: `typer`, `rich`, `pydantic`, `libtmux`
 - Create package structure:
   ```
-  agent/
+  yaam/
   ├── cli.py          # typer app entry point
   ├── config.py       # user config model
   ├── profile.py      # AgentProfile model + loader (stub)
@@ -26,12 +26,12 @@ Agent sessions are driven by **profiles** — named configurations that bundle t
   ```
 - Ensure the bundled `profiles/` directory is included in package data (configure `pyproject.toml` `[tool.hatch.build.targets.wheel] include` or equivalent)
 - Configure `ruff` in `pyproject.toml`: linting (`ruff check`) and formatting (`ruff format`) replacing both `flake8` and `black`
-- Register `agent` as a CLI entry point
-- Confirm `agent --help` runs cleanly
+- Register `yaam` as a CLI entry point
+- Confirm `yaam --help` runs cleanly
 
 ### Acceptance criteria
 
-- `agent --help` prints a command list with no errors
+- `yaam --help` prints a command list with no errors
 - All modules import without error
 - `pyproject.toml` pins all direct dependencies
 - `ruff check` and `ruff format --check` pass on the empty scaffold
@@ -68,7 +68,7 @@ Agent sessions are driven by **profiles** — named configurations that bundle t
 
 ### Profile format
 
-Profiles live at `~/.config/agent/profiles/<name>.toml`. Example:
+Profiles live at `~/.config/yaam/profiles/<name>.toml`. Example:
 
 ```toml
 [profile]
@@ -80,11 +80,11 @@ path = "~/projects/api"           # base repo for wt to operate in
 default_branch_prefix = "agent/"  # e.g. agent/fix-auth-123
 
 [tmux]
-setup_script = "~/.config/agent/scripts/backend-tmux.sh"
+setup_script = "~/.config/yaam/scripts/backend-tmux.sh"
 # your existing tmux layout script; called with the worktree path as $1
 
 [init]
-script = "~/.config/agent/scripts/backend-init.sh"
+script = "~/.config/yaam/scripts/backend-init.sh"
 # called once after tmux setup; receives worktree path as $1
 # responsible for: copying .env files, running npm install, starting dev server, etc.
 env = { NODE_ENV = "development" }  # extra env vars injected into the init script
@@ -94,17 +94,17 @@ env = { NODE_ENV = "development" }  # extra env vars injected into the init scri
 
 - Implement `profile.py`:
   - `AgentProfile` Pydantic model: `name`, `description`, `repo_path`, `default_branch_prefix`, `tmux_setup_script`, `init_script`, `init_env`
-  - `load(name: str) -> AgentProfile` — reads `~/.config/agent/profiles/<name>.toml`
+  - `load(name: str) -> AgentProfile` — reads `~/.config/yaam/profiles/<name>.toml`
   - `list_profiles() -> list[AgentProfile]` — lists all available profiles
   - `validate(profile: AgentProfile) -> list[str]` — checks scripts exist and are executable, repo path exists
-- Add `agent profile list` subcommand — renders a `rich` table of available profiles with description
-- Add `agent profile validate <name>` — runs `validate()` and reports issues
-- Write an `example.toml` profile to `~/.config/agent/profiles/` on first run
+- Add `yaam profile list` subcommand — renders a `rich` table of available profiles with description
+- Add `yaam profile validate <name>` — runs `validate()` and reports issues
+- Write an `example.toml` profile to `~/.config/yaam/profiles/` on first run
 
 ### Acceptance criteria
 
-- `agent profile list` shows all `.toml` files in the profiles directory
-- `agent profile validate backend` reports missing scripts or bad repo path clearly
+- `yaam profile list` shows all `.toml` files in the profiles directory
+- `yaam profile validate backend` reports missing scripts or bad repo path clearly
 - `AgentProfile` fails fast on load if required fields are missing (Pydantic validation)
 - A profile with a non-executable script path raises a clear `ProfileValidationError`
 
@@ -144,7 +144,7 @@ env = { NODE_ENV = "development" }  # extra env vars injected into the init scri
 
 - Implement `session.py`:
   - `AgentSession` Pydantic model: `name`, `branch`, `profile_name`, `worktree_path`, `tmux_session`, `tmux_pane_ref`, `created_at`, `status`
-  - `SessionStore`: read/write JSON state file at `~/.config/agent/sessions.json`
+  - `SessionStore`: read/write JSON state file at `~/.config/yaam/sessions.json`
     - `add(session: AgentSession) -> None`
     - `get(name: str) -> AgentSession | None`
     - `list() -> list[AgentSession]`
@@ -152,7 +152,7 @@ env = { NODE_ENV = "development" }  # extra env vars injected into the init scri
     - `update_status(name: str, status: str) -> None`
 - Implement `config.py`:
   - `AgentConfig` model: `default_profile`, `tmux_session_name`, `state_file_path`
-  - Load from `~/.config/agent/config.toml` with sensible defaults
+  - Load from `~/.config/yaam/config.toml` with sensible defaults
 
 ### Acceptance criteria
 
@@ -165,11 +165,11 @@ env = { NODE_ENV = "development" }  # extra env vars injected into the init scri
 
 ## Stage 6 — Core commands
 
-**Goal:** `agent new`, `agent list`, and `agent kill` working end to end, profile-driven.
+**Goal:** `yaam new`, `yaam list`, and `yaam kill` working end to end, profile-driven.
 
 ### Spawn sequence
 
-When `agent new <name> --profile <profile>` is called, the following steps run in order:
+When `yaam new <name> --profile <profile>` is called, the following steps run in order:
 
 1. Load and validate the profile
 2. `worktrunk.create(branch, repo_path=profile.repo_path)` — create worktree in the profile's base repo
@@ -179,7 +179,7 @@ When `agent new <name> --profile <profile>` is called, the following steps run i
 
 ### Tasks
 
-- `agent new <name> --profile <profile> [--branch <branch>]`
+- `yaam new <name> --profile <profile> [--branch <branch>]`
   - Runs the full spawn sequence above
   - `--branch` overrides the auto-generated branch name (default: `profile.default_branch_prefix + name`)
   - Streams init script output to the terminal with a `rich` spinner
@@ -188,32 +188,32 @@ When `agent new <name> --profile <profile>` is called, the following steps run i
   - Calls the init script with `repo_path` as `$1` and `worktree_path` as `$2`
   - Merges `profile.init_env` with the current environment
   - Streams stdout/stderr; raises `InitScriptError` on non-zero exit
-  - Logs full output to `~/.config/agent/logs/<name>-init.log`
-- `agent list`
+  - Logs full output to `~/.config/yaam/logs/<name>-init.log`
+- `yaam list`
   - Reads session store, cross-references with `wt list` and `tmux.pane_alive`
   - Renders a `rich` table: name, profile, branch, status, age, pane
-- `agent kill <name>`
+- `yaam kill <name>`
   - Kills tmux pane, runs `wt remove` on the worktree, removes session from store
 
 ### Acceptance criteria
 
-- Full round-trip: `agent new foo --profile backend` → tmux layout appears → init script runs → `agent list` shows it → `agent kill foo` removes it
+- Full round-trip: `yaam new foo --profile backend` → tmux layout appears → init script runs → `yaam list` shows it → `yaam kill foo` removes it
 - Init script failure surfaces the log path and exits cleanly — worktree and tmux pane are cleaned up on failure
-- `agent list` includes the profile name column
-- `agent kill` on an unknown name prints a helpful error, does not crash
+- `yaam list` includes the profile name column
+- `yaam kill` on an unknown name prints a helpful error, does not crash
 
 ---
 
 ## Stage 7 — Attach and sync
 
-**Goal:** `agent attach` and `agent sync` for day-to-day use.
+**Goal:** `yaam attach` and `yaam sync` for day-to-day use.
 
 ### Tasks
 
-- `agent attach <name>`
+- `yaam attach <name>`
   - Switches the current terminal to the named tmux pane
   - Prints an error if the pane is dead
-- `agent sync`
+- `yaam sync`
   - Finds orphaned sessions: in store but pane dead and/or worktree gone
   - Finds untracked worktrees: `wt list` returns entries not in store
   - Reports discrepancies with a `rich` table
@@ -221,9 +221,9 @@ When `agent new <name> --profile <profile>` is called, the following steps run i
 
 ### Acceptance criteria
 
-- `agent attach foo` puts the user inside the correct pane
-- `agent sync` detects a manually removed worktree as orphaned
-- `agent sync --fix` clears orphaned sessions without touching live ones
+- `yaam attach foo` puts the user inside the correct pane
+- `yaam sync` detects a manually removed worktree as orphaned
+- `yaam sync --fix` clears orphaned sessions without touching live ones
 
 ---
 
@@ -251,16 +251,16 @@ When `agent new <name> --profile <profile>` is called, the following steps run i
 
 - Implement `orchestrator/graph.py`:
   - `plan_node` — supervisor breaks a goal into tasks, assigns a profile to each
-  - `dispatch_node` — calls `agent new --profile <task.profile>` for each task
+  - `dispatch_node` — calls `yaam new --profile <task.profile>` for each task
   - `monitor_node` — polls pane status and result files
   - `collect_node` — reads results from `results/<name>.json` per agent
   - `review_node` — supervisor reviews collected results, decides next step
 - Implement `orchestrator/worker.py` — thin wrapper each agent process runs; writes result to `results/<name>.json` on completion
-- Add `agent run <goal> [--profile <profile>]` CLI command — entry point into the graph
+- Add `yaam run <goal> [--profile <profile>]` CLI command — entry point into the graph
 
 ### Acceptance criteria
 
-- `agent run "add a health check endpoint" --profile backend` spawns at least one worker in its own worktree with the correct tmux layout and init sequence
+- `yaam run "add a health check endpoint" --profile backend` spawns at least one worker in its own worktree with the correct tmux layout and init sequence
 - Supervisor collects results after worker completes
 - Graph reaches `done` phase without manual intervention for a simple single-task goal
 - Failure in one worker does not crash the supervisor
@@ -273,17 +273,17 @@ When `agent new <name> --profile <profile>` is called, the following steps run i
 
 ### Tasks
 
-- Add `--json` output flag to `agent list` for scripting
-- Add shell completions via `typer` (`agent --install-completion`)
+- Add `--json` output flag to `yaam list` for scripting
+- Add shell completions via `typer` (`yaam --install-completion`)
 - Write a `README.md` with installation, quickstart, profile authoring guide, and Worktrunk setup instructions
-- Add `agent doctor` command: checks `wt` installed, tmux running, config valid, at least one profile valid
+- Add `yaam doctor` command: checks `wt` installed, tmux running, config valid, at least one profile valid
 - Publish to PyPI or package as a standalone binary via `pyinstaller`
 
 ### Acceptance criteria
 
-- `agent doctor` passes on a clean machine with `wt`, tmux, and one valid profile
+- `yaam doctor` passes on a clean machine with `wt`, tmux, and one valid profile
 - Shell completions work in zsh and bash
-- `pip install agent-cli` (or equivalent) produces a working `agent` binary
+- `pip install yaam` (or equivalent) produces a working `yaam` binary
 
 ---
 

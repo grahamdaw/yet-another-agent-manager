@@ -36,7 +36,7 @@ When making changes:
 
 ## Project Overview
 
-**Yet Another Agent Manager** — A Python CLI tool that manages tmux sessions and git worktrees (via Worktrunk), with a path to multi-agent orchestration via LangGraph.
+**yaam (Yet Another Agent Manager)** — A Python CLI tool that manages tmux sessions and git worktrees (via Worktrunk), with a path to multi-agent orchestration via LangGraph.
 
 Agent sessions are driven by **profiles** — named configurations that bundle a base repository, a tmux layout script, and a post-init script. Spawning an agent with a profile fully automates the environment setup for that agent role.
 
@@ -44,14 +44,14 @@ Agent sessions are driven by **profiles** — named configurations that bundle a
 
 ```
 src/
-  agent/
+  yaam/
     __init__.py       # Package root
     cli.py            # typer app entry point
-    config.py         # user config model (stub)
-    profile.py        # AgentProfile model + loader (stub)
-    session.py        # AgentSession model + state file (stub)
-    tmux.py           # libtmux wrapper (stub)
-    worktrunk.py      # wt subprocess wrapper (stub)
+    config.py         # user config model
+    profile.py        # AgentProfile model + loader
+    session.py        # AgentSession model + state file
+    tmux.py           # libtmux wrapper
+    worktrunk.py      # wt subprocess wrapper
     profiles/         # bundled profile templates
 docs/
   specs/
@@ -79,11 +79,11 @@ The full implementation plan is in `docs/specs/01-init.md`. Additional specs liv
 | 3     | Profile system        | **Done**    | `01-init.md`            | Named profile configs for agent roles                    |
 | 4     | tmux wrapper          | **Done**    | `01-init.md`            | `libtmux` wrapper for managing panes                     |
 | 5     | Session state         | **Done**    | `01-init.md`            | Persistent session store (`sessions.json`)               |
-| 6     | Core commands         | **Done**    | `01-init.md`            | `agent new`, `agent list`, `agent kill`                  |
-| 7     | Attach and sync       | **Done**    | `01-init.md`            | `agent attach`, `agent sync`                             |
+| 6     | Core commands         | **Done**    | `01-init.md`            | `yaam new`, `yaam list`, `yaam kill`                     |
+| 7     | Attach and sync       | **Done**    | `01-init.md`            | `yaam attach`, `yaam sync`                               |
 | 8     | LangGraph orchestrator| **Done**    | `01-init.md`            | Multi-agent supervisor with LangGraph                    |
-| 9     | Polish and packaging  | **Done**    | `01-init.md`            | Shell completions, `agent doctor`, README, PyPI packaging |
-| 10    | Rename to yaam        | **Pending** | `02-rename-to-yaam.md`  | Rename package, executable, module, and config paths to `yaam` |
+| 9     | Polish and packaging  | **Done**    | `01-init.md`            | Shell completions, `yaam doctor`, README, PyPI packaging  |
+| 10    | Rename to yaam        | **Done**    | `02-rename-to-yaam.md`  | Rename package, executable, module, and config paths to `yaam` |
 
 ## Dependencies
 
@@ -104,7 +104,7 @@ The full implementation plan is in `docs/specs/01-init.md`. Additional specs liv
 ## Package Structure
 
 ```
-src/agent/
+src/yaam/
 ├── __init__.py       # package root
 ├── cli.py            # typer app — new/list/kill/attach/sync/run/doctor commands
 ├── config.py         # AgentConfig model + load_config() (TOML, sensible defaults)
@@ -114,7 +114,7 @@ src/agent/
 ├── tmux.py           # libtmux wrapper (PaneRef, get_or_create_session, run_setup_script, create/send/kill/alive)
 ├── worktrunk.py      # wt subprocess wrapper (WorktreeInfo, WorktrunkError, create/remove/list/merge)
 ├── profiles/
-│   └── example.toml  # bundled example profile written to ~/.config/agent/profiles/ on first run
+│   └── example.toml  # bundled example profile written to ~/.config/yaam/profiles/ on first run
 └── orchestrator/
     ├── __init__.py   # package root
     ├── models.py     # Task, TaskResult, OrchestratorState TypedDicts
@@ -131,8 +131,8 @@ tests/
 README.md             # Installation, quickstart, profile authoring guide, commands reference
 ```
 
-Profiles live at `~/.config/agent/profiles/<name>.toml`.
-Session state lives at `~/.config/agent/sessions.json`.
+Profiles live at `~/.config/yaam/profiles/<name>.toml`.
+Session state lives at `~/.config/yaam/sessions.json`.
 
 ## Agent Skills
 
