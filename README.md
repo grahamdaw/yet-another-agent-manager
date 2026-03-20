@@ -92,8 +92,8 @@ yaam new my-feature --profile backend
 
 This will:
 1. Create a git worktree on branch `agent/my-feature`
-2. Run your tmux setup script to build the layout
-3. Run your init script (install deps, copy `.env`, etc.)
+2. Run your init script (install deps, copy `.env`, etc.)
+3. Run your tmux setup script to build the layout
 4. Save session state
 
 ### 3. Manage sessions
@@ -127,7 +127,7 @@ A profile bundles three things:
 |---|---|
 | `repo.path` | Absolute path to the base git repo Worktrunk operates in |
 | `tmux.setup_script` | Script that builds your tmux layout; receives the worktree path as `$1` |
-| `init.script` | Post-setup script; receives `repo_path $1` and `worktree_path $2` |
+| `init.script` | Runs after worktree setup, before tmux; receives `repo_path $1` and `worktree_path $2` |
 
 The `init.script` is responsible for anything needed to make the worktree ready to work in:
 copying `.env` files, installing dependencies, starting background processes, etc.
