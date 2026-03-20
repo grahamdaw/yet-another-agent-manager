@@ -29,7 +29,6 @@ description = "Backend API agent — NestJS"    # optional but recommended
 
 [repo]
 path = "~/projects/api"                       # required; base repo wt operates in
-default_branch_prefix = "agent/"             # optional; default is "agent/"
 
 [tmux]
 setup_script = "~/.config/yaam/scripts/backend-tmux.sh"   # required
@@ -46,7 +45,6 @@ env = { NODE_ENV = "development" }                          # optional
 | `[profile]` | `name` | yes | — | Must match the `.toml` filename (without extension) |
 | `[profile]` | `description` | no | `""` | Shown in `yaam profile list` |
 | `[repo]` | `path` | yes | — | Absolute or `~`-prefixed path to the base git repo |
-| `[repo]` | `default_branch_prefix` | no | `"agent/"` | Branch names become `<prefix><session-name>` |
 | `[tmux]` | `setup_script` | yes | — | Path to the tmux layout script |
 | `[init]` | `script` | yes | — | Path to the post-init script |
 | `[init]` | `env` | no | `{}` | Extra env vars injected into the init script |
@@ -144,7 +142,6 @@ description = "Backend API agent"
 
 [repo]
 path = "~/projects/api"
-default_branch_prefix = "agent/"
 
 [tmux]
 setup_script = "~/.config/yaam/scripts/backend-tmux.sh"
@@ -179,13 +176,14 @@ yaam profile list
 ## Common patterns
 
 **Monorepo with multiple agent roles** — create one profile per role, each pointing to the same
-`repo.path` but with different scripts and branch prefixes:
+`repo.path` but with different scripts. Branch names come directly from the session name passed
+to `yaam new`, so use descriptive session names to keep branches organised:
 
 ```
 ~/.config/yaam/profiles/
-├── backend.toml    # default_branch_prefix = "agent/be/"
-├── frontend.toml   # default_branch_prefix = "agent/fe/"
-└── docs.toml       # default_branch_prefix = "agent/docs/"
+├── backend.toml    # yaam new be-my-feature --profile backend  → branch: be-my-feature
+├── frontend.toml   # yaam new fe-my-feature --profile frontend → branch: fe-my-feature
+└── docs.toml       # yaam new docs-update   --profile docs     → branch: docs-update
 ```
 
 **Shared init logic** — if multiple profiles share setup steps, extract them into a shared
