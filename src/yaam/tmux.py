@@ -57,7 +57,7 @@ def run_setup_script(
 
     with log_file.open("w") as fh:
         result = subprocess.run(
-            [str(script_path), str(worktree_path)],
+            [str(script_path), str(session_name), str(worktree_path)],
             stdout=fh,
             stderr=subprocess.PIPE,
             text=True,

@@ -123,7 +123,7 @@ def test_run_setup_script_success(tmp_path):
 
     mock_run.assert_called_once()
     args = mock_run.call_args[0][0]
-    assert args == [str(SCRIPT), str(WORKTREE)]
+    assert args == [str(SCRIPT), SESSION, str(WORKTREE)]
 
 
 def test_run_setup_script_writes_log(tmp_path):
