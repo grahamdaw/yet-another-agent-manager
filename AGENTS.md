@@ -74,7 +74,7 @@ The full implementation plan is in `docs/specs/01-init.md`. It defines 9 stages:
 | 3     | Profile system        | **Done**| Named profile configs for agent roles                    |
 | 4     | tmux wrapper          | **Done**| `libtmux` wrapper for managing panes                     |
 | 5     | Session state         | **Done**| Persistent session store (`sessions.json`)               |
-| 6     | Core commands         | Pending | `agent new`, `agent list`, `agent kill`                  |
+| 6     | Core commands         | **Done**| `agent new`, `agent list`, `agent kill`                  |
 | 7     | Attach and sync       | Pending | `agent attach`, `agent sync`                             |
 | 8     | LangGraph orchestrator| Pending | Multi-agent supervisor with LangGraph                    |
 | 9     | Polish and packaging  | Pending | Shell completions, `agent doctor`, PyPI packaging        |
@@ -110,14 +110,16 @@ src/agent/
 ├── tmux.py         # libtmux wrapper (PaneRef, get_or_create_session, run_setup_script, create/send/kill/alive)
 ├── session.py      # AgentSession model + SessionStore (filelock, JSON state file)
 ├── config.py       # AgentConfig model + load_config() (TOML, sensible defaults)
-├── init.py         # post-init script runner (not yet created)
+├── init.py         # post-init script runner (InitScriptError, run())
 └── profiles/
     └── example.toml  # bundled example profile written to ~/.config/agent/profiles/ on first run
 tests/
 ├── test_worktrunk.py  # 19 tests with subprocess mocking
 ├── test_profile.py    # 17 tests for profile load/list/validate/example
 ├── test_tmux.py       # 17 tests for libtmux wrapper (fully mocked)
-└── test_session.py    # 21 tests for AgentSession, SessionStore, AgentConfig
+├── test_session.py    # 21 tests for AgentSession, SessionStore, AgentConfig
+├── test_init.py       # 7 tests for init script runner
+└── test_cli.py        # 14 tests for agent new/list/kill via CliRunner
 ```
 
 Profiles live at `~/.config/agent/profiles/<name>.toml`.
