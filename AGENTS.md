@@ -72,7 +72,7 @@ The full implementation plan is in `docs/specs/01-init.md`. It defines 9 stages:
 | 1     | Project scaffold      | **Done**| CLI skeleton with `typer`, `rich`, `pydantic`, `libtmux` |
 | 2     | Worktrunk wrapper     | **Done**| Python wrapper around `wt` CLI commands                  |
 | 3     | Profile system        | **Done**| Named profile configs for agent roles                    |
-| 4     | tmux wrapper          | Pending | `libtmux` wrapper for managing panes                     |
+| 4     | tmux wrapper          | **Done**| `libtmux` wrapper for managing panes                     |
 | 5     | Session state         | Pending | Persistent session store (`sessions.json`)               |
 | 6     | Core commands         | Pending | `agent new`, `agent list`, `agent kill`                  |
 | 7     | Attach and sync       | Pending | `agent attach`, `agent sync`                             |
@@ -107,12 +107,14 @@ src/agent/
 ├── tmux.py         # libtmux wrapper (stub)
 ├── worktrunk.py    # wt subprocess wrapper (WorktreeInfo, WorktrunkError, create/remove/list/merge)
 ├── profile.py      # AgentProfile model, load/list_profiles/validate, _ensure_example_profile
+├── tmux.py         # libtmux wrapper (PaneRef, get_or_create_session, run_setup_script, create/send/kill/alive)
 ├── init.py         # post-init script runner (not yet created)
 └── profiles/
     └── example.toml  # bundled example profile written to ~/.config/agent/profiles/ on first run
 tests/
 ├── test_worktrunk.py  # 19 tests with subprocess mocking
-└── test_profile.py    # 17 tests for profile load/list/validate/example
+├── test_profile.py    # 17 tests for profile load/list/validate/example
+└── test_tmux.py       # 17 tests for libtmux wrapper (fully mocked)
 ```
 
 Profiles live at `~/.config/agent/profiles/<name>.toml`.
