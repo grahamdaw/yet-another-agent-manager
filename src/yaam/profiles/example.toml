@@ -7,11 +7,11 @@ path = "~/projects/my-repo"           # base repo path; wt operates from here
 default_branch_prefix = "agent/"      # branch names become e.g. agent/my-feature
 
 [tmux]
-setup_script = "~/.config/agent/scripts/example-tmux.sh"
+setup_script = "~/.config/yaam/scripts/example-tmux.sh"
 # your existing tmux layout script; called with the worktree path as $1
 
 [init]
-script = "~/.config/agent/scripts/example-init.sh"
+script = "~/.config/yaam/scripts/example-init.sh"
 # called once after tmux setup; receives worktree path as $1
 # responsible for: copying .env files, installing deps, starting dev server, etc.
 env = { MY_VAR = "value" }            # extra env vars injected into the init script
