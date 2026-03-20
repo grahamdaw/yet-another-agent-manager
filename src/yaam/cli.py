@@ -74,7 +74,7 @@ def new(
             console.print(f"  [red]•[/red] {issue}")
         raise typer.Exit(1)
 
-    branch_name = branch or f"{p.default_branch_prefix}{name}"
+    branch_name = branch or name
     cfg = config_mod.load_config()
 
     worktree_info = None
@@ -418,9 +418,8 @@ def profile_list() -> None:
     table.add_column("Name", style="bold")
     table.add_column("Description")
     table.add_column("Repo Path")
-    table.add_column("Branch Prefix")
     for p in profiles:
-        table.add_row(p.name, p.description, str(p.repo_path), p.default_branch_prefix)
+        table.add_row(p.name, p.description, str(p.repo_path))
     console.print(table)
 
 

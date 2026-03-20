@@ -4,7 +4,6 @@ description = "Example agent profile — customize for your project"
 
 [repo]
 path = "~/projects/my-repo"           # base repo path; wt operates from here
-default_branch_prefix = "agent/"      # branch names become e.g. agent/my-feature
 
 [init]
 script = "~/.config/yaam/scripts/example-init.sh"
