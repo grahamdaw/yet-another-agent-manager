@@ -240,6 +240,34 @@ def test_create_matches_branch_with_prefix(has_wt):
     assert info.branch == "refs/heads/my-branch"
 
 
+def test_create_injects_worktrunk_worktree_path_env(has_wt):
+    list_payload = _wt_list_json(
+        _wt_list_entry("my-branch", "/repo/my-branch", head_short="cafebabe"),
+    )
+    responses = [_completed(), _completed(stdout=list_payload)]
+    with patch("subprocess.run", side_effect=responses) as mock_run:
+        create("my-branch", FAKE_REPO)
+
+    switch_kwargs = mock_run.call_args_list[0].kwargs
+    env = switch_kwargs.get("env")
+    assert env is not None
+    assert env["WORKTRUNK_WORKTREE_PATH"] == (
+        "{{ repo_path }}/../.worktrunk-{{ repo }}.{{ branch | sanitize }}"
+    )
+
+
+def test_create_list_call_has_no_extra_env(has_wt):
+    list_payload = _wt_list_json(
+        _wt_list_entry("my-branch", "/repo/my-branch", head_short="cafebabe"),
+    )
+    responses = [_completed(), _completed(stdout=list_payload)]
+    with patch("subprocess.run", side_effect=responses) as mock_run:
+        create("my-branch", FAKE_REPO)
+
+    list_kwargs = mock_run.call_args_list[1].kwargs
+    assert "env" not in list_kwargs
+
+
 # ---------------------------------------------------------------------------
 # remove
 # ---------------------------------------------------------------------------
