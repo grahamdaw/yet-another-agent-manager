@@ -35,7 +35,14 @@ cd yet-another-agent-manager
 uv tool install .
 ```
 
-This puts `yaam` and `yaam-worker` on your PATH without polluting a global Python environment. Re-run `uv tool install .` after `git pull` to pick up changes.
+This puts `yaam` and `yaam-worker` on your PATH without polluting a global Python environment.
+
+To update to the latest version:
+
+```bash
+git pull
+uv tool install --force .
+```
 
 **Alternative — pip in the current environment:**
 

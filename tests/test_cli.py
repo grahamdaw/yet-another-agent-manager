@@ -444,4 +444,3 @@ def test_doctor_fails_without_wt():
         result = runner.invoke(app, ["doctor"])
 
     assert result.exit_code == 1
-
