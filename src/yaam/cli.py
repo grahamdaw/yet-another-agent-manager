@@ -2,7 +2,6 @@
 
 import contextlib
 from datetime import UTC, datetime
-from pathlib import Path
 
 import typer
 from rich.console import Console
@@ -325,103 +324,6 @@ def run(
 
     console.print(table)
     console.print(f"[green]✓[/green] Orchestration complete — phase: {final_state.get('phase')}")
-
-
-# ---------------------------------------------------------------------------
-# Update command
-# ---------------------------------------------------------------------------
-
-
-def _find_source_dir() -> Path | None:
-    """Walk up from the installed package file to find the git repo root."""
-    import yaam as _yaam_pkg
-
-    candidate = Path(_yaam_pkg.__file__).resolve()
-    for _ in range(8):
-        candidate = candidate.parent
-        if (candidate / ".git").exists():
-            return candidate
-    return None
-
-
-@app.command()
-def update(
-    check: bool = typer.Option(
-        False, "--check", help="Only check if an update is available without applying it"
-    ),
-) -> None:
-    """Update yaam from its source repository (git pull origin main + reinstall)."""
-    import shutil
-    import subprocess
-
-    source_dir = _find_source_dir()
-    if source_dir is None:
-        console.print(
-            "[red]Error:[/red] Cannot locate the yaam source repository. "
-            "yaam must be installed from a local clone "
-            "(e.g. 'uv tool install .' or 'pip install -e .')."
-        )
-        raise typer.Exit(1)
-
-    if check:
-        fetch = subprocess.run(
-            ["git", "fetch", "origin", "main"],
-            cwd=source_dir,
-            capture_output=True,
-            text=True,
-        )
-        if fetch.returncode != 0:
-            console.print(f"[red]git fetch failed:[/red] {fetch.stderr.strip()}")
-            raise typer.Exit(1)
-
-        count_result = subprocess.run(
-            ["git", "rev-list", "HEAD..origin/main", "--count"],
-            cwd=source_dir,
-            capture_output=True,
-            text=True,
-        )
-        count = int(count_result.stdout.strip() or "0")
-        if count > 0:
-            console.print(f"[yellow]Update available[/yellow] — {count} commit(s) on origin/main")
-        else:
-            console.print("[green]Already up to date.[/green]")
-        return
-
-    with console.status("Pulling latest changes from origin/main..."):
-        pull = subprocess.run(
-            ["git", "pull", "--ff-only", "origin", "main"],
-            cwd=source_dir,
-            capture_output=True,
-            text=True,
-        )
-
-    if pull.returncode != 0:
-        console.print(f"[red]git pull failed:[/red] {pull.stderr.strip()}")
-        raise typer.Exit(1)
-
-    summary = pull.stdout.strip()
-    if "Already up to date" in summary:
-        console.print("[green]Already up to date.[/green]")
-        return
-
-    console.print(f"[cyan]Pulled:[/cyan] {summary}")
-
-    installer = (
-        ["uv", "tool", "install", ".", "--force"] if shutil.which("uv") else ["pip", "install", "."]
-    )
-    with console.status("Reinstalling yaam..."):
-        install = subprocess.run(
-            installer,
-            cwd=source_dir,
-            capture_output=True,
-            text=True,
-        )
-
-    if install.returncode != 0:
-        console.print(f"[red]Reinstall failed:[/red] {install.stderr.strip()}")
-        raise typer.Exit(1)
-
-    console.print("[green]✓[/green] yaam updated successfully.")
 
 
 # ---------------------------------------------------------------------------
