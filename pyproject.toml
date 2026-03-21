@@ -3,6 +3,7 @@ name = "yaam"
 version = "0.1.0"
 description = "A CLI tool that manages tmux sessions and git worktrees for multi-agent orchestration"
 readme = "README.md"
+license = { file = "LICENSE" }
 authors = [
     { name = "Graham Daw", email = "grahamdaw@users.noreply.github.com" }
 ]
