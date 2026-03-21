@@ -1,6 +1,7 @@
 """Worktrunk (wt) subprocess wrapper."""
 
 import json
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -39,15 +40,17 @@ def _require_wt() -> None:
         )
 
 
-def _run(args: list[str], cwd: str | Path | None = None) -> subprocess.CompletedProcess[str]:
+def _run(
+    args: list[str],
+    cwd: str | Path | None = None,
+    extra_env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
     """Run a wt command, raising WorktrunkError on non-zero exit."""
     _require_wt()
-    result = subprocess.run(
-        ["wt", *args],
-        cwd=cwd,
-        capture_output=True,
-        text=True,
-    )
+    kwargs: dict = {"cwd": cwd, "capture_output": True, "text": True}
+    if extra_env is not None:
+        kwargs["env"] = {**os.environ, **extra_env}
+    result = subprocess.run(["wt", *args], **kwargs)
     if result.returncode != 0:
         raise WorktrunkError(
             f"wt {' '.join(args)} failed (exit {result.returncode}):\n{result.stderr.strip()}"
@@ -61,7 +64,12 @@ def create(branch: str, repo_path: str | Path) -> WorktreeInfo:
     Calls ``wt switch --create <branch>`` from repo_path and returns a
     populated WorktreeInfo for the new worktree.
     """
-    _run(["switch", "--create", branch], cwd=repo_path)
+    extra_env = {
+        "WORKTRUNK_WORKTREE_PATH": (
+            "{{ repo_path }}/../.worktrunk-{{ repo }}.{{ branch | sanitize }}"
+        )
+    }
+    _run(["switch", "--create", branch], cwd=repo_path, extra_env=extra_env)
     worktrees = list_worktrees(repo_path)
     for entry in worktrees:
         if entry.branch == branch or entry.branch.endswith(f"/{branch}"):
@@ -93,10 +101,7 @@ def _worktree_from_list_entry(entry: dict) -> WorktreeInfo | None:
         head = commit.get("short_sha") or (sha[:7] if len(sha) >= 7 else sha)
         branch = entry.get("branch") or ""
         wt = entry.get("working_tree") or {}
-        dirty = any(
-            wt.get(k)
-            for k in ("staged", "modified", "untracked", "renamed", "deleted")
-        )
+        dirty = any(wt.get(k) for k in ("staged", "modified", "untracked", "renamed", "deleted"))
         status = "dirty" if dirty else "clean"
         return WorktreeInfo(
             branch=branch,
