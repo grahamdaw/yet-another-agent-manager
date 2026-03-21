@@ -89,6 +89,7 @@ The full implementation plan is in `docs/specs/01-init.md`. Additional specs liv
 | 10    | Rename to yaam        | **Done**    | `02-rename-to-yaam.md`  | Rename package, executable, module, and config paths to `yaam` |
 | 11    | tmux script session arg | **Done**  | `04-tmux-script-session-arg.md` | Pass session name as `$1` and worktree path as `$2` to tmux setup scripts |
 | 12    | Session name as branch  | **Done**  | `05-session-name-as-branch.md`  | Branch name equals session name; `default_branch_prefix` removed |
+| 13    | Update command          | **Done**  | `06-update-command.md`          | `yaam update [--check]` — pulls `origin main` and reinstalls from local clone |
 
 ## Dependencies
 
@@ -111,7 +112,7 @@ The full implementation plan is in `docs/specs/01-init.md`. Additional specs liv
 ```
 src/yaam/
 ├── __init__.py       # package root
-├── cli.py            # typer app — new/list/kill/attach/sync/run/doctor commands
+├── cli.py            # typer app — new/list/kill/attach/sync/run/doctor/update commands
 ├── config.py         # AgentConfig model + load_config() (TOML, sensible defaults)
 ├── init.py           # post-init script runner (InitScriptError, run())
 ├── profile.py        # AgentProfile model (no branch prefix), load/list_profiles/validate, _ensure_example_profile
