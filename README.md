@@ -99,7 +99,7 @@ yaam new my-feature --profile backend
 ```
 
 This will:
-1. Create a git worktree on branch `my-feature`
+1. Create a git worktree on branch `my-feature` at `<repo-parent>/.worktrunk-<repo>.<branch>`
 2. Run your init script (install deps, copy `.env`, etc.)
 3. Run your tmux setup script to build the layout
 4. Save session state
@@ -150,6 +150,8 @@ Full output from both scripts is logged to `~/.config/yaam/logs/<name>-init.log`
 brew install grahamdaw/tap/worktrunk  # or follow the upstream install instructions
 wt --help
 ```
+
+yaam overrides Worktrunk's default worktree location. Worktrees are created as **hidden sibling directories** of your repo, named `.worktrunk-<repo>.<branch>`. For example, for repo `~/projects/api` and branch `my-feature`, the worktree is at `~/projects/.worktrunk-api.my-feature`. The leading dot keeps them out of normal directory listings.
 
 ## Commands reference
 

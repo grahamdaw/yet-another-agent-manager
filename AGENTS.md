@@ -60,6 +60,7 @@ docs/
     03-init-before-tmux.md    # Run init script before tmux setup
     04-tmux-script-session-arg.md  # Pass session name as $1 to tmux setup script
     05-session-name-as-branch.md  # Session name is the branch name; default_branch_prefix removed
+    08-worktrunk-hidden-worktree-dirs.md  # yaam overrides WORKTRUNK_WORKTREE_PATH to use .worktrunk- prefix
 .agents/
   skills/
     feature-spec/     # Skill: how to spec and register a new feature
@@ -89,6 +90,7 @@ The full implementation plan is in `docs/specs/01-init.md`. Additional specs liv
 | 10    | Rename to yaam        | **Done**    | `02-rename-to-yaam.md`  | Rename package, executable, module, and config paths to `yaam` |
 | 11    | tmux script session arg | **Done**  | `04-tmux-script-session-arg.md` | Pass session name as `$1` and worktree path as `$2` to tmux setup scripts |
 | 12    | Session name as branch  | **Done**  | `05-session-name-as-branch.md`  | Branch name equals session name; `default_branch_prefix` removed |
+| 13    | Hidden worktree dirs    | **Done**  | `08-worktrunk-hidden-worktree-dirs.md` | `create()` injects `WORKTRUNK_WORKTREE_PATH` to place worktrees as `.worktrunk-<repo>.<branch>` |
 
 ## Dependencies
 
@@ -117,7 +119,7 @@ src/yaam/
 ├── profile.py        # AgentProfile model (no branch prefix), load/list_profiles/validate, _ensure_example_profile
 ├── session.py        # AgentSession model + SessionStore (filelock, JSON state file)
 ├── tmux.py           # libtmux wrapper (PaneRef, get_or_create_session, run_setup_script[$1=session,$2=worktree], create/send/kill/alive)
-├── worktrunk.py      # wt subprocess wrapper (WorktreeInfo, WorktrunkError; list via ``wt list --format=json``)
+├── worktrunk.py      # wt subprocess wrapper (WorktreeInfo, WorktrunkError; list via ``wt list --format=json``; sets WORKTRUNK_WORKTREE_PATH=".worktrunk-<repo>.<branch>" on create)
 ├── profiles/
 │   └── example.toml  # bundled example profile written to ~/.config/yaam/profiles/ on first run
 └── orchestrator/
