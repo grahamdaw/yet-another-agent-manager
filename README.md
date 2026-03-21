@@ -1,5 +1,7 @@
 # yaam
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 A Python CLI tool that manages **tmux sessions** and **git worktrees** (via [Worktrunk](https://github.com/grahamdaw/worktrunk)) for multi-agent software engineering workflows, with built-in multi-agent orchestration via [LangGraph](https://github.com/langchain-ai/langgraph).
 
 **Distribution:** yaam is meant to be **cloned and installed from your local checkout**. There is no supported PyPI-first workflow; treat this repo as the source of truth and upgrade by pulling.
@@ -173,3 +175,12 @@ uv run pytest
 uv run ruff check src/ tests/
 uv run ruff format src/ tests/
 ```
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for how to get started, branch naming,
+commit conventions, and the review process.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
