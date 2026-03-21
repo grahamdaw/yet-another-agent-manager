@@ -35,6 +35,31 @@ def _wt_list_json(*entries: dict) -> str:
     return json.dumps(list(entries))
 
 
+def _wt_list_entry(
+    branch: str,
+    path: str,
+    *,
+    head_short: str = "abc123",
+    dirty: bool = False,
+) -> dict:
+    """Build one Worktrunk ``wt list --format=json`` row (modern schema)."""
+    wt: dict = {}
+    if dirty:
+        wt["modified"] = True
+    return {
+        "branch": branch,
+        "path": path,
+        "kind": "worktree",
+        "commit": {
+            "sha": "a" * 40,
+            "short_sha": head_short,
+            "message": "test",
+            "timestamp": 0,
+        },
+        "working_tree": wt,
+    }
+
+
 # ---------------------------------------------------------------------------
 # wt_available
 # ---------------------------------------------------------------------------
@@ -109,8 +134,8 @@ def test_run_raises_worktrunk_error_on_failure(has_wt):
 
 def test_list_worktrees_returns_entries(has_wt):
     payload = _wt_list_json(
-        {"branch": "main", "path": "/repo", "status": "clean", "head": "abc123"},
-        {"branch": "feature/x", "path": "/repo-feature-x", "status": "dirty", "head": "def456"},
+        _wt_list_entry("main", "/repo", head_short="abc123"),
+        _wt_list_entry("feature/x", "/repo-feature-x", head_short="def456", dirty=True),
     )
     with patch("subprocess.run", return_value=_completed(stdout=payload)):
         result = list_worktrees(FAKE_REPO)
@@ -131,23 +156,42 @@ def test_list_worktrees_empty(has_wt):
 def test_list_worktrees_raises_on_bad_json(has_wt):
     with (
         patch("subprocess.run", return_value=_completed(stdout="not-json")),
-        pytest.raises(WorktrunkError, match="parse"),
+        pytest.raises(WorktrunkError, match=r"parse.*format=json"),
+    ):
+        list_worktrees(FAKE_REPO)
+
+
+def test_list_worktrees_raises_on_non_array_json(has_wt):
+    with (
+        patch("subprocess.run", return_value=_completed(stdout='{"x": 1}')),
+        pytest.raises(WorktrunkError, match="array"),
     ):
         list_worktrees(FAKE_REPO)
 
 
 def test_list_worktrees_passes_cwd(has_wt):
-    payload = _wt_list_json(
-        {"branch": "main", "path": str(FAKE_REPO), "status": "clean", "head": "aaa"}
-    )
+    payload = _wt_list_json(_wt_list_entry("main", str(FAKE_REPO), head_short="aaa"))
     with patch("subprocess.run", return_value=_completed(stdout=payload)) as mock_run:
         list_worktrees(FAKE_REPO)
     mock_run.assert_called_once_with(
-        ["wt", "list", "--json"],
+        ["wt", "list", "--format=json"],
         cwd=FAKE_REPO,
         capture_output=True,
         text=True,
     )
+
+
+def test_list_worktrees_legacy_flat_json(has_wt):
+    """Older flat ``branch``/``path``/``status``/``head`` rows still parse."""
+    payload = _wt_list_json(
+        {"branch": "main", "path": "/repo", "status": "clean", "head": "abc123"},
+    )
+    with patch("subprocess.run", return_value=_completed(stdout=payload)):
+        result = list_worktrees(FAKE_REPO)
+    assert len(result) == 1
+    assert result[0].branch == "main"
+    assert result[0].status == "clean"
+    assert result[0].head == "abc123"
 
 
 # ---------------------------------------------------------------------------
@@ -157,12 +201,7 @@ def test_list_worktrees_passes_cwd(has_wt):
 
 def test_create_returns_worktree_info(has_wt):
     list_payload = _wt_list_json(
-        {
-            "branch": "my-branch",
-            "path": "/repo/my-branch",
-            "status": "clean",
-            "head": "cafebabe",
-        }
+        _wt_list_entry("my-branch", "/repo/my-branch", head_short="cafebabe"),
     )
     responses = [
         _completed(),  # wt switch --create
@@ -178,7 +217,7 @@ def test_create_returns_worktree_info(has_wt):
 
 def test_create_raises_if_branch_not_in_list(has_wt):
     list_payload = _wt_list_json(
-        {"branch": "other-branch", "path": "/repo/other", "status": "clean", "head": "000"}
+        _wt_list_entry("other-branch", "/repo/other", head_short="000"),
     )
     responses = [
         _completed(),  # wt switch --create succeeds
@@ -193,12 +232,7 @@ def test_create_raises_if_branch_not_in_list(has_wt):
 
 def test_create_matches_branch_with_prefix(has_wt):
     list_payload = _wt_list_json(
-        {
-            "branch": "refs/heads/my-branch",
-            "path": "/repo/my-branch",
-            "status": "clean",
-            "head": "111",
-        }
+        _wt_list_entry("refs/heads/my-branch", "/repo/my-branch", head_short="111"),
     )
     responses = [_completed(), _completed(stdout=list_payload)]
     with patch("subprocess.run", side_effect=responses):

@@ -80,26 +80,62 @@ def remove(worktree_path: str | Path) -> None:
     _run(["remove"], cwd=worktree_path)
 
 
+def _worktree_from_list_entry(entry: dict) -> WorktreeInfo | None:
+    """Map one ``wt list --format=json`` object to WorktreeInfo, or None to skip."""
+    path_str = entry.get("path")
+    if not path_str:
+        return None
+
+    # Current Worktrunk: nested ``commit`` / ``working_tree`` (see worktrunk.dev/list).
+    if "commit" in entry:
+        commit = entry.get("commit") or {}
+        sha = commit.get("sha") or ""
+        head = commit.get("short_sha") or (sha[:7] if len(sha) >= 7 else sha)
+        branch = entry.get("branch") or ""
+        wt = entry.get("working_tree") or {}
+        dirty = any(
+            wt.get(k)
+            for k in ("staged", "modified", "untracked", "renamed", "deleted")
+        )
+        status = "dirty" if dirty else "clean"
+        return WorktreeInfo(
+            branch=branch,
+            path=Path(path_str),
+            status=status,
+            head=head,
+        )
+
+    # Legacy flat JSON (older wt / tests): branch, path, status, head
+    return WorktreeInfo(
+        branch=entry.get("branch", ""),
+        path=Path(path_str),
+        status=entry.get("status", "unknown"),
+        head=entry.get("head", ""),
+    )
+
+
 def list_worktrees(repo_path: str | Path) -> list[WorktreeInfo]:
     """Return all active worktrees for the repo at *repo_path*.
 
-    Calls ``wt list --json`` and parses the JSON output. Each entry is
-    expected to have ``branch``, ``path``, ``status``, and ``head`` keys.
+    Calls ``wt list --format=json`` and parses the JSON array. Skips rows
+    without a ``path`` (e.g. branch-only listings). Supports the current
+    Worktrunk shape (``commit``, ``working_tree``) and legacy flat objects.
     """
-    result = _run(["list", "--json"], cwd=repo_path)
+    result = _run(["list", "--format=json"], cwd=repo_path)
     try:
         data = json.loads(result.stdout)
     except json.JSONDecodeError as exc:
-        raise WorktrunkError(f"Failed to parse wt list --json output: {exc}") from exc
-    return [
-        WorktreeInfo(
-            branch=entry.get("branch", ""),
-            path=Path(entry.get("path", "")),
-            status=entry.get("status", "unknown"),
-            head=entry.get("head", ""),
-        )
-        for entry in data
-    ]
+        raise WorktrunkError(f"Failed to parse wt list --format=json output: {exc}") from exc
+    if not isinstance(data, list):
+        raise WorktrunkError("wt list --format=json did not return a JSON array")
+    out: list[WorktreeInfo] = []
+    for entry in data:
+        if not isinstance(entry, dict):
+            continue
+        info = _worktree_from_list_entry(entry)
+        if info is not None:
+            out.append(info)
+    return out
 
 
 def merge(worktree_path: str | Path, target: str = "main") -> None:

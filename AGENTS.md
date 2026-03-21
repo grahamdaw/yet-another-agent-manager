@@ -117,7 +117,7 @@ src/yaam/
 ├── profile.py        # AgentProfile model (no branch prefix), load/list_profiles/validate, _ensure_example_profile
 ├── session.py        # AgentSession model + SessionStore (filelock, JSON state file)
 ├── tmux.py           # libtmux wrapper (PaneRef, get_or_create_session, run_setup_script[$1=session,$2=worktree], create/send/kill/alive)
-├── worktrunk.py      # wt subprocess wrapper (WorktreeInfo, WorktrunkError, create/remove/list/merge)
+├── worktrunk.py      # wt subprocess wrapper (WorktreeInfo, WorktrunkError; list via ``wt list --format=json``)
 ├── profiles/
 │   └── example.toml  # bundled example profile written to ~/.config/yaam/profiles/ on first run
 └── orchestrator/
