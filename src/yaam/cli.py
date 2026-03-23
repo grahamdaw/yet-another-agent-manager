@@ -151,6 +151,7 @@ def list_sessions(
         return
 
     table = Table(show_header=True, header_style="bold cyan")
+    table.add_column("#", style="dim")
     table.add_column("Name", style="bold")
     table.add_column("Profile")
     table.add_column("Branch")
@@ -158,7 +159,7 @@ def list_sessions(
     table.add_column("Age")
     table.add_column("tmux session")
 
-    for s in sessions:
+    for idx, s in enumerate(sessions):
         try:
             alive = tmux_mod.pane_alive(s.tmux_pane_ref)
             status = "[green]alive[/green]" if alive else "[red]dead[/red]"
@@ -166,6 +167,7 @@ def list_sessions(
             status = s.status
 
         table.add_row(
+            str(idx),
             s.name,
             s.profile_name,
             s.branch,
