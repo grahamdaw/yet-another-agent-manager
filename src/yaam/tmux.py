@@ -67,8 +67,7 @@ def run_setup_script(
 
     if result.returncode != 0:
         raise TmuxScriptError(
-            f"tmux setup script failed (exit {result.returncode})\n"
-            f"{result.stderr}\nLog: {log_file}"
+            f"tmux setup script failed (exit {result.returncode})\n{result.stderr}\nLog: {log_file}"
         )
 
 
