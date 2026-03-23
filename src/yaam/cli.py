@@ -56,6 +56,16 @@ def new(
     branch: str | None = typer.Option(None, "--branch", "-b", help="Override branch name"),
 ) -> None:
     """Spawn a new agent session."""
+    # --- Reject purely numeric names ------------------------------------
+    if name.isdigit():
+        console.print(
+            f"[red]Error:[/red] Session name '{name}' is not allowed — purely numeric names"
+            " conflict with session indexes.\n"
+            "       Choose a descriptive name such as"
+            f" 'feature-{name}' or 'worker-{name}'."
+        )
+        raise typer.Exit(1)
+
     # --- Load & validate profile ----------------------------------------
     try:
         p = profile_mod.load(profile)
@@ -79,6 +89,7 @@ def new(
     tmux_session = re.sub(r'[/\\:*?"<>|]', "-", name)
 
     worktree_info = None
+    pane_ref = None
 
     try:
         with console.status(f"Creating worktree for branch '[cyan]{branch_name}[/cyan]'..."):
@@ -89,9 +100,9 @@ def new(
 
         with console.status("Running tmux setup script..."):
             tmux_mod.get_or_create_session(tmux_session)
-            tmux_mod.run_setup_script(
-                p.tmux_setup_script, worktree_info.path, tmux_session, name
-            )
+            tmux_mod.run_setup_script(p.tmux_setup_script, worktree_info.path, tmux_session)
+
+        pane_ref = tmux_mod.create_pane(tmux_session, name)
 
         SessionStore().add(
             AgentSession(
@@ -100,6 +111,7 @@ def new(
                 profile_name=profile,
                 worktree_path=worktree_info.path,
                 tmux_session=tmux_session,
+                tmux_pane_ref=pane_ref,
                 created_at=datetime.now(UTC),
             )
         )
@@ -109,6 +121,9 @@ def new(
 
     except Exception as exc:
         console.print(f"\n[red]Spawn failed:[/red] {exc}")
+        if pane_ref is not None:
+            with contextlib.suppress(Exception):
+                tmux_mod.kill_pane(pane_ref)
         if worktree_info is not None:
             with contextlib.suppress(Exception):
                 worktrunk.remove(worktree_info.path)
@@ -136,6 +151,7 @@ def list_sessions(
         return
 
     table = Table(show_header=True, header_style="bold cyan")
+    table.add_column("#", style="dim")
     table.add_column("Name", style="bold")
     table.add_column("Profile")
     table.add_column("Branch")
@@ -143,14 +159,15 @@ def list_sessions(
     table.add_column("Age")
     table.add_column("tmux session")
 
-    for s in sessions:
+    for idx, s in enumerate(sessions):
         try:
-            alive = tmux_mod.session_alive(s.tmux_session)
+            alive = tmux_mod.pane_alive(s.tmux_pane_ref)
             status = "[green]alive[/green]" if alive else "[red]dead[/red]"
         except Exception:
             status = s.status
 
         table.add_row(
+            str(idx),
             s.name,
             s.profile_name,
             s.branch,
@@ -172,7 +189,7 @@ def kill(name: str = typer.Argument(help="Name of the agent session to kill")) -
         raise typer.Exit(1)
 
     with contextlib.suppress(Exception):
-        tmux_mod.kill_session(session.tmux_session)
+        tmux_mod.kill_pane(session.tmux_pane_ref)
 
     if worktrunk.wt_available():
         with contextlib.suppress(Exception):
@@ -183,17 +200,31 @@ def kill(name: str = typer.Argument(help="Name of the agent session to kill")) -
 
 
 @app.command()
-def attach(name: str = typer.Argument(help="Name of the agent session to attach to")) -> None:
+def attach(
+    name: str = typer.Argument(help="Name or index (from 'yaam list') of the session to attach to"),
+) -> None:
     """Attach to an existing agent session."""
     store = SessionStore()
-    session = store.get(name)
-    if session is None:
-        console.print(f"[red]Error:[/red] No session named '{name}'")
-        raise typer.Exit(1)
 
-    if not tmux_mod.session_alive(session.tmux_session):
+    # Try to resolve by index first (purely numeric argument → index lookup).
+    # Purely numeric names are rejected at creation time, so there is no ambiguity.
+    session = None
+    try:
+        index = int(name)
+        session = store.get_by_index(index)
+        if session is None:
+            console.print(f"[red]Error:[/red] No session at index {index}")
+            raise typer.Exit(1)
+    except ValueError:
+        session = store.get(name)
+        if session is None:
+            console.print(f"[red]Error:[/red] No session named '{name}'")
+            raise typer.Exit(1) from None
+
+    if not tmux_mod.pane_alive(session.tmux_pane_ref):
         console.print(
-            f"[red]Error:[/red] tmux session for '{name}' is gone. Run [bold]yaam sync --fix[/bold]."
+            f"[red]Error:[/red] Pane for session '{name}' is dead."
+            " Run [bold]yaam sync --fix[/bold]."
         )
         raise typer.Exit(1)
 
@@ -223,7 +254,7 @@ def sync(
 
     for s in sessions:
         try:
-            alive = tmux_mod.session_alive(s.tmux_session)
+            alive = tmux_mod.pane_alive(s.tmux_pane_ref)
         except Exception:
             alive = False
         worktree_exists = s.worktree_path.exists()

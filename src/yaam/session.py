@@ -7,6 +7,8 @@ from pathlib import Path
 from filelock import FileLock
 from pydantic import BaseModel
 
+from yaam.tmux import PaneRef
+
 STATE_FILE = Path("~/.config/yaam/sessions.json")
 
 
@@ -18,6 +20,7 @@ class AgentSession(BaseModel):
     profile_name: str
     worktree_path: Path
     tmux_session: str
+    tmux_pane_ref: PaneRef
     created_at: datetime
     status: str = "running"
 
@@ -53,6 +56,13 @@ class SessionStore:
         if entry is None:
             return None
         return AgentSession.model_validate(entry)
+
+    def get_by_index(self, index: int) -> AgentSession | None:
+        """Return the session at 0-based position *index*, or None if out of range."""
+        sessions = self.list()
+        if index < 0 or index >= len(sessions):
+            return None
+        return sessions[index]
 
     def list(self) -> list[AgentSession]:
         """Return all stored sessions."""

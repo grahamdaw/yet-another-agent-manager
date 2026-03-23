@@ -169,6 +169,30 @@ def test_store_written_as_valid_json(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# SessionStore.get_by_index
+# ---------------------------------------------------------------------------
+
+
+def test_get_by_index_empty_store(tmp_path):
+    assert _store(tmp_path).get_by_index(0) is None
+
+
+def test_get_by_index_valid(tmp_path):
+    store = _store(tmp_path)
+    store.add(_session(name="alpha"))
+    store.add(_session(name="beta"))
+    assert store.get_by_index(0).name == "alpha"
+    assert store.get_by_index(1).name == "beta"
+
+
+def test_get_by_index_out_of_range(tmp_path):
+    store = _store(tmp_path)
+    store.add(_session(name="only"))
+    assert store.get_by_index(1) is None
+    assert store.get_by_index(-1) is None
+
+
+# ---------------------------------------------------------------------------
 # AgentConfig / load_config
 # ---------------------------------------------------------------------------
 
