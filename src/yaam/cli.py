@@ -92,7 +92,7 @@ def new(
     pane_ref = None
 
     try:
-        with console.status(f"Creating worktree for branch '[cyan]{branch_name}[/cyan]'..."):
+        with console.status(f"Setting up worktree for branch '[cyan]{branch_name}[/cyan]'..."):
             worktree_info = worktrunk.create(branch_name, p.repo_path)
 
         with console.status("Running init script..."):
