@@ -205,10 +205,21 @@ def attach(
 ) -> None:
     """Attach to an existing agent session."""
     store = SessionStore()
-    session = store.get(name)
-    if session is None:
-        console.print(f"[red]Error:[/red] No session named '{name}'")
-        raise typer.Exit(1)
+
+    # Try to resolve by index first (purely numeric argument → index lookup).
+    # Purely numeric names are rejected at creation time, so there is no ambiguity.
+    session = None
+    try:
+        index = int(name)
+        session = store.get_by_index(index)
+        if session is None:
+            console.print(f"[red]Error:[/red] No session at index {index}")
+            raise typer.Exit(1)
+    except ValueError:
+        session = store.get(name)
+        if session is None:
+            console.print(f"[red]Error:[/red] No session named '{name}'")
+            raise typer.Exit(1) from None
 
     if not tmux_mod.pane_alive(session.tmux_pane_ref):
         console.print(
