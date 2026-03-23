@@ -57,6 +57,13 @@ class SessionStore:
             return None
         return AgentSession.model_validate(entry)
 
+    def get_by_index(self, index: int) -> AgentSession | None:
+        """Return the session at 0-based position *index*, or None if out of range."""
+        sessions = self.list()
+        if index < 0 or index >= len(sessions):
+            return None
+        return sessions[index]
+
     def list(self) -> list[AgentSession]:
         """Return all stored sessions."""
         data = self._read()
