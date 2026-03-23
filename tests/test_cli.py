@@ -85,6 +85,36 @@ def test_new_happy_path(tmp_path):
     assert "spawned" in result.output
 
 
+def test_new_numeric_name_rejected():
+    result = runner.invoke(app, ["new", "0", "--profile", "x"])
+    assert result.exit_code == 1
+    assert "not allowed" in result.output
+
+
+def test_new_numeric_name_rejected_multi_digit():
+    result = runner.invoke(app, ["new", "42", "--profile", "x"])
+    assert result.exit_code == 1
+    assert "not allowed" in result.output
+
+
+def test_new_alphanumeric_name_accepted():
+    with (
+        patch("yaam.cli.profile_mod.load", return_value=_profile()),
+        patch("yaam.cli.profile_mod.validate", return_value=[]),
+        patch("yaam.cli.worktrunk.create", return_value=_worktree_info()),
+        patch("yaam.cli.tmux_mod.get_or_create_session"),
+        patch("yaam.cli.tmux_mod.run_setup_script"),
+        patch("yaam.cli.tmux_mod.create_pane", return_value=_PANE_REF),
+        patch("yaam.cli.init_mod.run"),
+        patch("yaam.cli.SessionStore") as mock_store_cls,
+        patch("yaam.cli.config_mod.load_config", return_value=_cfg()),
+    ):
+        mock_store_cls.return_value.add = MagicMock()
+        result = runner.invoke(app, ["new", "feature-0", "--profile", "backend"])
+
+    assert result.exit_code == 0
+
+
 def test_new_profile_not_found():
     with patch("yaam.cli.profile_mod.load", side_effect=FileNotFoundError("not found")):
         result = runner.invoke(app, ["new", "foo", "--profile", "missing"])
@@ -259,6 +289,21 @@ def test_list_handles_tmux_error_gracefully():
     assert "running" in result.output
 
 
+def test_list_shows_index_column():
+    sessions = [_session(name="foo"), _session(name="bar")]
+    with (
+        patch("yaam.cli.SessionStore") as mock_store_cls,
+        patch("yaam.cli.tmux_mod.pane_alive", return_value=True),
+    ):
+        mock_store_cls.return_value.list.return_value = sessions
+        result = runner.invoke(app, ["list"])
+
+    assert result.exit_code == 0
+    assert "#" in result.output
+    assert "0" in result.output
+    assert "1" in result.output
+
+
 # ---------------------------------------------------------------------------
 # agent attach
 # ---------------------------------------------------------------------------
@@ -296,6 +341,28 @@ def test_attach_dead_pane():
 
     assert result.exit_code == 1
     assert "dead" in result.output
+
+
+def test_attach_by_index():
+    with (
+        patch("yaam.cli.SessionStore") as mock_store_cls,
+        patch("yaam.cli.tmux_mod.pane_alive", return_value=True),
+        patch("subprocess.run") as mock_run,
+    ):
+        mock_store_cls.return_value.get_by_index.return_value = _session()
+        result = runner.invoke(app, ["attach", "0"])
+
+    assert result.exit_code == 0
+    mock_run.assert_called_once()
+
+
+def test_attach_by_index_out_of_range():
+    with patch("yaam.cli.SessionStore") as mock_store_cls:
+        mock_store_cls.return_value.get_by_index.return_value = None
+        result = runner.invoke(app, ["attach", "99"])
+
+    assert result.exit_code == 1
+    assert "No session at index 99" in result.output
 
 
 # ---------------------------------------------------------------------------
