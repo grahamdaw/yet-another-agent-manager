@@ -1,6 +1,7 @@
 """CLI entry point for the agent tool."""
 
 import contextlib
+import re
 from datetime import UTC, datetime
 
 import typer
@@ -75,10 +76,9 @@ def new(
         raise typer.Exit(1)
 
     branch_name = branch or name
-    cfg = config_mod.load_config()
+    tmux_session = re.sub(r'[/\\:*?"<>|]', "-", name)
 
     worktree_info = None
-    pane_ref = None
 
     try:
         with console.status(f"Creating worktree for branch '[cyan]{branch_name}[/cyan]'..."):
@@ -88,13 +88,10 @@ def new(
             init_mod.run(p.init_script, p.repo_path, worktree_info.path, p.init_env, name)
 
         with console.status("Running tmux setup script..."):
-            tmux_mod.get_or_create_session(cfg.tmux_session_name)
+            tmux_mod.get_or_create_session(tmux_session)
             tmux_mod.run_setup_script(
-                p.tmux_setup_script, worktree_info.path, cfg.tmux_session_name
+                p.tmux_setup_script, worktree_info.path, tmux_session, name
             )
-
-        with console.status(f"Creating pane for '[cyan]{name}[/cyan]'..."):
-            pane_ref = tmux_mod.create_pane(cfg.tmux_session_name, name)
 
         SessionStore().add(
             AgentSession(
@@ -102,8 +99,7 @@ def new(
                 branch=branch_name,
                 profile_name=profile,
                 worktree_path=worktree_info.path,
-                tmux_session=cfg.tmux_session_name,
-                tmux_pane_ref=pane_ref,
+                tmux_session=tmux_session,
                 created_at=datetime.now(UTC),
             )
         )
@@ -113,9 +109,6 @@ def new(
 
     except Exception as exc:
         console.print(f"\n[red]Spawn failed:[/red] {exc}")
-        if pane_ref is not None:
-            with contextlib.suppress(Exception):
-                tmux_mod.kill_pane(pane_ref)
         if worktree_info is not None:
             with contextlib.suppress(Exception):
                 worktrunk.remove(worktree_info.path)
@@ -148,11 +141,11 @@ def list_sessions(
     table.add_column("Branch")
     table.add_column("Status")
     table.add_column("Age")
-    table.add_column("Pane")
+    table.add_column("tmux session")
 
     for s in sessions:
         try:
-            alive = tmux_mod.pane_alive(s.tmux_pane_ref)
+            alive = tmux_mod.session_alive(s.tmux_session)
             status = "[green]alive[/green]" if alive else "[red]dead[/red]"
         except Exception:
             status = s.status
@@ -163,7 +156,7 @@ def list_sessions(
             s.branch,
             status,
             _age(s.created_at),
-            s.tmux_pane_ref.pane_id,
+            s.tmux_session,
         )
 
     console.print(table)
@@ -179,7 +172,7 @@ def kill(name: str = typer.Argument(help="Name of the agent session to kill")) -
         raise typer.Exit(1)
 
     with contextlib.suppress(Exception):
-        tmux_mod.kill_pane(session.tmux_pane_ref)
+        tmux_mod.kill_session(session.tmux_session)
 
     if worktrunk.wt_available():
         with contextlib.suppress(Exception):
@@ -198,18 +191,19 @@ def attach(name: str = typer.Argument(help="Name of the agent session to attach 
         console.print(f"[red]Error:[/red] No session named '{name}'")
         raise typer.Exit(1)
 
-    if not tmux_mod.pane_alive(session.tmux_pane_ref):
+    if not tmux_mod.session_alive(session.tmux_session):
         console.print(
-            f"[red]Error:[/red] Pane for '{name}' is dead. Run [bold]yaam sync --fix[/bold]."
+            f"[red]Error:[/red] tmux session for '{name}' is gone. Run [bold]yaam sync --fix[/bold]."
         )
         raise typer.Exit(1)
 
+    import os
     import subprocess
 
-    subprocess.run(
-        ["tmux", "switch-client", "-t", session.tmux_pane_ref.pane_id],
-        check=False,
-    )
+    if os.environ.get("TMUX"):
+        subprocess.run(["tmux", "switch-client", "-t", session.tmux_session], check=False)
+    else:
+        subprocess.run(["tmux", "attach-session", "-t", session.tmux_session], check=False)
 
 
 @app.command()
@@ -229,7 +223,7 @@ def sync(
 
     for s in sessions:
         try:
-            alive = tmux_mod.pane_alive(s.tmux_pane_ref)
+            alive = tmux_mod.session_alive(s.tmux_session)
         except Exception:
             alive = False
         worktree_exists = s.worktree_path.exists()
@@ -246,14 +240,14 @@ def sync(
     table = Table(show_header=True, header_style="bold yellow")
     table.add_column("Name", style="bold")
     table.add_column("Branch")
-    table.add_column("Pane")
+    table.add_column("tmux session")
     table.add_column("Worktree")
 
-    for s, pane_ok, wt_ok in orphaned:
+    for s, session_ok, wt_ok in orphaned:
         table.add_row(
             s.name,
             s.branch,
-            "[green]alive[/green]" if pane_ok else "[red]dead[/red]",
+            "[green]alive[/green]" if session_ok else "[red]dead[/red]",
             "[green]exists[/green]" if wt_ok else "[red]missing[/red]",
         )
 

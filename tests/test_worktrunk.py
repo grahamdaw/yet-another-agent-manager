@@ -205,7 +205,7 @@ def test_create_returns_worktree_info(has_wt):
     )
     responses = [
         _completed(),  # wt switch --create
-        _completed(stdout=list_payload),  # wt list --json
+        _completed(stdout=list_payload),  # wt list --format json
     ]
     with patch("subprocess.run", side_effect=responses):
         info = create("my-branch", FAKE_REPO)

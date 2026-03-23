@@ -8,7 +8,7 @@ A Python CLI tool that manages **tmux sessions** and **git worktrees** (via [Wor
 
 ## Features
 
-- Spawn isolated agent sessions — each gets its own git worktree and tmux pane
+- One session per agent — each feature branch gets its own dedicated tmux session and git worktree
 - Profile-driven setup — bundle repo, tmux layout, and init script into a named config
 - Persistent session state — sessions survive shell restarts
 - Multi-agent orchestration — `yaam run` dispatches a swarm of workers via LangGraph
@@ -101,18 +101,20 @@ yaam new my-feature --profile backend
 This will:
 1. Create a git worktree on branch `my-feature` at `<repo-parent>/.worktrunk-<repo>.<branch>`
 2. Run your init script (install deps, copy `.env`, etc.)
-3. Run your tmux setup script to build the layout
+3. Create a dedicated tmux session named `my-feature` and run your tmux setup script inside it
 4. Save session state
+
+Each agent gets its own isolated tmux session — one feature, one session, one worktree.
 
 ### 3. Manage sessions
 
 ```bash
 yaam list              # view all sessions
 yaam list --json       # JSON output for scripting
-yaam attach my-feature # switch into the agent's tmux pane
+yaam attach my-feature # switch into the agent's tmux session
 yaam sync              # detect orphaned sessions
 yaam sync --fix        # remove orphaned sessions from store
-yaam kill my-feature   # kill pane, remove worktree, clear state
+yaam kill my-feature   # kill tmux session, remove worktree, clear state
 ```
 
 ### 4. Multi-agent orchestration
@@ -134,13 +136,13 @@ A profile bundles three things:
 | Field | Description |
 |---|---|
 | `repo.path` | Absolute path to the base git repo Worktrunk operates in |
-| `tmux.setup_script` | Script that builds your tmux layout; receives session name as `$1` and worktree path as `$2` |
-| `init.script` | Runs after worktree setup, before tmux; receives `repo_path $1` and `worktree_path $2` |
+| `tmux.setup_script` | Script that builds your tmux layout; receives the agent's dedicated tmux session name as `$1` and worktree path as `$2` |
+| `init.script` | Runs after worktree setup, before tmux; receives `repo_path` as `$1` and `worktree_path` as `$2` |
 
 The `init.script` is responsible for anything needed to make the worktree ready to work in:
 copying `.env` files, installing dependencies, starting background processes, etc.
 
-Full output from both scripts is logged to `~/.config/yaam/logs/<name>-init.log`.
+Full output from both scripts is appended to `~/.config/yaam/logs/<name>.log` (slashes in the name are replaced with dashes).
 
 ## Worktrunk setup
 

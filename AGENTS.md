@@ -29,6 +29,7 @@ See `.beads/README.md` for full documentation.
 **This is a critical rule.** Every change to the repository that adds, removes, or modifies features, fixes, or project structure **must** include an update to this file. AGENTS.md is the source of truth for what exists in this repo and how it works.
 
 When making changes:
+
 1. Update the relevant section below to reflect the new state
 2. Add new sections if introducing entirely new concepts
 3. Remove sections for deleted functionality
@@ -38,7 +39,15 @@ When making changes:
 
 **yaam (Yet Another Agent Manager)** — A Python CLI tool that manages tmux sessions and git worktrees (via Worktrunk), with a path to multi-agent orchestration via LangGraph. It is **distributed as a clone-and-install** project (see README): install from the repository root with `uv tool install .` or `pip install .`, not from PyPI.
 
-Agent sessions are driven by **profiles** — named configurations that bundle a base repository, a tmux layout script, and a post-init script. Spawning an agent with a profile fully automates the environment setup for that agent role.
+### Architecture
+
+The core model is **one feature → one session → one worktree → one agent**:
+
+- Each `yaam new` creates a **dedicated tmux session** named after the agent (slashes replaced with dashes) and a **git worktree** on the corresponding branch
+- Sessions are fully isolated — no shared tmux session between agents
+- `yaam kill` tears down the tmux session, removes the worktree, and clears the state entry
+
+Agent sessions are driven by **profiles** — named configurations that bundle a base repository, a tmux layout script, and a post-init script. The tmux setup script receives the agent's session name as `$1` and the worktree path as `$2`, and is free to build whatever layout it needs. yaam does not create any windows or panes itself.
 
 ## Repository Structure
 
@@ -76,26 +85,27 @@ pyproject.toml        # Project config, dependencies, ruff, entry points
 
 The full implementation plan is in `docs/specs/01-init.md`. Additional specs live in `docs/specs/`.
 
-| Stage | Name                  | Status      | Spec                    | Description                                              |
-|-------|-----------------------|-------------|-------------------------|----------------------------------------------------------|
-| 1     | Project scaffold      | **Done**    | `01-init.md`            | CLI skeleton with `typer`, `rich`, `pydantic`, `libtmux` |
-| 2     | Worktrunk wrapper     | **Done**    | `01-init.md`            | Python wrapper around `wt` CLI commands                  |
-| 3     | Profile system        | **Done**    | `01-init.md`            | Named profile configs for agent roles                    |
-| 4     | tmux wrapper          | **Done**    | `01-init.md`            | `libtmux` wrapper for managing panes                     |
-| 5     | Session state         | **Done**    | `01-init.md`            | Persistent session store (`sessions.json`)               |
-| 6     | Core commands         | **Done**    | `01-init.md`            | `yaam new`, `yaam list`, `yaam kill`                     |
-| 7     | Attach and sync       | **Done**    | `01-init.md`            | `yaam attach`, `yaam sync`                               |
-| 8     | LangGraph orchestrator| **Done**    | `01-init.md`            | Multi-agent supervisor with LangGraph                    |
-| 9     | Polish and packaging  | **Done**    | `01-init.md`            | Shell completions, `yaam doctor`, README, `pyproject` packaging (local install)  |
-| 10    | Rename to yaam        | **Done**    | `02-rename-to-yaam.md`  | Rename package, executable, module, and config paths to `yaam` |
-| 11    | tmux script session arg | **Done**  | `04-tmux-script-session-arg.md` | Pass session name as `$1` and worktree path as `$2` to tmux setup scripts |
-| 12    | Session name as branch  | **Done**  | `05-session-name-as-branch.md`  | Branch name equals session name; `default_branch_prefix` removed |
-| 13    | Hidden worktree dirs    | **Done**  | `08-worktrunk-hidden-worktree-dirs.md` | `create()` injects `WORKTRUNK_WORKTREE_PATH` to place worktrees as `.worktrunk-<repo>.<branch>` |
+| Stage | Name                    | Status   | Spec                                   | Description                                                                                     |
+| ----- | ----------------------- | -------- | -------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| 1     | Project scaffold        | **Done** | `01-init.md`                           | CLI skeleton with `typer`, `rich`, `pydantic`, `libtmux`                                        |
+| 2     | Worktrunk wrapper       | **Done** | `01-init.md`                           | Python wrapper around `wt` CLI commands                                                         |
+| 3     | Profile system          | **Done** | `01-init.md`                           | Named profile configs for agent roles                                                           |
+| 4     | tmux wrapper            | **Done** | `01-init.md`                           | `libtmux` wrapper for managing panes                                                            |
+| 5     | Session state           | **Done** | `01-init.md`                           | Persistent session store (`sessions.json`)                                                      |
+| 6     | Core commands           | **Done** | `01-init.md`                           | `yaam new`, `yaam list`, `yaam kill`                                                            |
+| 7     | Attach and sync         | **Done** | `01-init.md`                           | `yaam attach`, `yaam sync`                                                                      |
+| 8     | LangGraph orchestrator  | **Done** | `01-init.md`                           | Multi-agent supervisor with LangGraph                                                           |
+| 9     | Polish and packaging    | **Done** | `01-init.md`                           | Shell completions, `yaam doctor`, README, `pyproject` packaging (local install)                 |
+| 10    | Rename to yaam          | **Done** | `02-rename-to-yaam.md`                 | Rename package, executable, module, and config paths to `yaam`                                  |
+| 11    | tmux script session arg | **Done** | `04-tmux-script-session-arg.md`        | Pass session name as `$1` and worktree path as `$2` to tmux setup scripts                       |
+| 12    | Session name as branch  | **Done** | `05-session-name-as-branch.md`         | Branch name equals session name; `default_branch_prefix` removed                                |
+| 13    | Hidden worktree dirs    | **Done** | `08-worktrunk-hidden-worktree-dirs.md` | `create()` injects `WORKTRUNK_WORKTREE_PATH` to place worktrees as `.worktrunk-<repo>.<branch>` |
+| 14    | One session per agent   | **Done** | —                                      | Each agent gets its own tmux session; `tmux_session_name` config removed; `kill` tears down the session |
 
 ## Dependencies
 
 | Package               | Purpose                  |
-|-----------------------|--------------------------|
+| --------------------- | ------------------------ |
 | `typer`               | CLI interface            |
 | `rich`                | Terminal output          |
 | `pydantic`            | Data models              |
@@ -118,7 +128,7 @@ src/yaam/
 ├── init.py           # post-init script runner (InitScriptError, run())
 ├── profile.py        # AgentProfile model (no branch prefix), load/list_profiles/validate, _ensure_example_profile
 ├── session.py        # AgentSession model + SessionStore (filelock, JSON state file)
-├── tmux.py           # libtmux wrapper (PaneRef, get_or_create_session, run_setup_script[$1=session,$2=worktree], create/send/kill/alive)
+├── tmux.py           # libtmux wrapper (get_or_create_session, run_setup_script[$1=session,$2=worktree], kill_session, session_alive)
 ├── worktrunk.py      # wt subprocess wrapper (WorktreeInfo, WorktrunkError; list via ``wt list --format=json``; sets WORKTRUNK_WORKTREE_PATH=".worktrunk-<repo>.<branch>" on create)
 ├── profiles/
 │   └── example.toml  # bundled example profile written to ~/.config/yaam/profiles/ on first run
@@ -146,9 +156,9 @@ Session state lives at `~/.config/yaam/sessions.json`.
 Reusable agent instructions live in `.agents/skills/`. Each skill is a directory containing a
 `SKILL.md` with YAML frontmatter (`name`, `description`) and markdown instructions.
 
-| Skill | Description |
-|---|---|
-| `feature-spec` | How to spec and register a new feature (check docs → write spec → review → create Beads issues → sync) |
+| Skill            | Description                                                                                                                                                                         |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `feature-spec`   | How to spec and register a new feature (check docs → write spec → review → create Beads issues → sync)                                                                              |
 | `create-profile` | How to create a profile TOML, write tmux/init scripts, validate, and troubleshoot. Use this skill (invoke with `/create-profile`) when creating or configuring a new agent profile. |
 
 When adding a new skill, create `.agents/skills/<name>/SKILL.md` and add a row to this table.

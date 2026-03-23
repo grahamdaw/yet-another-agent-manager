@@ -23,18 +23,18 @@ def run(
 
     Calls ``script_path repo_path worktree_path`` as a subprocess.
     Merges *env* with the current process environment.  Full output
-    (stdout + stderr combined) is logged to
-    ``~/.config/yaam/logs/<session_name>-init.log``.
+    (stdout + stderr combined) is appended to
+    ``~/.config/yaam/logs/<session_name>.log``.
     Raises InitScriptError on non-zero exit.
     """
     logs_dir = LOGS_DIR.expanduser()
     logs_dir.mkdir(parents=True, exist_ok=True)
     safe_name = re.sub(r'[/\\:*?"<>|]', "-", session_name)
-    log_file = logs_dir / f"{safe_name}-init.log"
+    log_file = logs_dir / f"{safe_name}.log"
 
     merged_env = {**os.environ, **env}
 
-    with log_file.open("w") as fh:
+    with log_file.open("a") as fh:
         result = subprocess.run(
             [str(script_path), str(repo_path), str(worktree_path)],
             env=merged_env,

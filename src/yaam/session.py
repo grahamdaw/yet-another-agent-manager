@@ -5,9 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 from filelock import FileLock
-from pydantic import BaseModel, ConfigDict, field_serializer, field_validator
-
-from yaam.tmux import PaneRef
+from pydantic import BaseModel
 
 STATE_FILE = Path("~/.config/yaam/sessions.json")
 
@@ -15,27 +13,13 @@ STATE_FILE = Path("~/.config/yaam/sessions.json")
 class AgentSession(BaseModel):
     """Persistent record of a live agent session."""
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
     name: str
     branch: str
     profile_name: str
     worktree_path: Path
     tmux_session: str
-    tmux_pane_ref: PaneRef
     created_at: datetime
     status: str = "running"
-
-    @field_validator("tmux_pane_ref", mode="before")
-    @classmethod
-    def _coerce_pane_ref(cls, v: object) -> PaneRef:
-        if isinstance(v, dict):
-            return PaneRef(**v)
-        return v  # type: ignore[return-value]
-
-    @field_serializer("tmux_pane_ref")
-    def _serialize_pane_ref(self, v: PaneRef) -> dict[str, str]:
-        return {"session_id": v.session_id, "window_id": v.window_id, "pane_id": v.pane_id}
 
 
 class SessionStore:
