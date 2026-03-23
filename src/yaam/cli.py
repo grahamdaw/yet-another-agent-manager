@@ -100,7 +100,9 @@ def new(
 
         with console.status("Running tmux setup script..."):
             tmux_mod.get_or_create_session(tmux_session)
-            tmux_mod.run_setup_script(p.tmux_setup_script, worktree_info.path, tmux_session)
+            tmux_mod.run_setup_script(
+                p.tmux_setup_script, worktree_info.path, tmux_session
+            )
 
         pane_ref = tmux_mod.create_pane(tmux_session, name)
 
@@ -200,9 +202,7 @@ def kill(name: str = typer.Argument(help="Name of the agent session to kill")) -
 
 
 @app.command()
-def attach(
-    name: str = typer.Argument(help="Name or index (from 'yaam list') of the session to attach to"),
-) -> None:
+def attach(name: str = typer.Argument(help="Name or index (from 'yaam list') of the session to attach to")) -> None:
     """Attach to an existing agent session."""
     store = SessionStore()
 
