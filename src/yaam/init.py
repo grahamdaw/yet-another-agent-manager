@@ -1,6 +1,7 @@
 """Post-init script runner."""
 
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -28,7 +29,8 @@ def run(
     """
     logs_dir = LOGS_DIR.expanduser()
     logs_dir.mkdir(parents=True, exist_ok=True)
-    log_file = logs_dir / f"{session_name}-init.log"
+    safe_name = re.sub(r'[/\\:*?"<>|]', "-", session_name)
+    log_file = logs_dir / f"{safe_name}-init.log"
 
     merged_env = {**os.environ, **env}
 
