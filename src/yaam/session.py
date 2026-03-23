@@ -7,6 +7,8 @@ from pathlib import Path
 from filelock import FileLock
 from pydantic import BaseModel
 
+from yaam.tmux import PaneRef
+
 STATE_FILE = Path("~/.config/yaam/sessions.json")
 
 
@@ -18,6 +20,7 @@ class AgentSession(BaseModel):
     profile_name: str
     worktree_path: Path
     tmux_session: str
+    tmux_pane_ref: PaneRef
     created_at: datetime
     status: str = "running"
 
