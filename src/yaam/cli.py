@@ -56,6 +56,16 @@ def new(
     branch: str | None = typer.Option(None, "--branch", "-b", help="Override branch name"),
 ) -> None:
     """Spawn a new agent session."""
+    # --- Reject purely numeric names ------------------------------------
+    if name.isdigit():
+        console.print(
+            f"[red]Error:[/red] Session name '{name}' is not allowed — purely numeric names"
+            " conflict with session indexes.\n"
+            "       Choose a descriptive name such as"
+            f" 'feature-{name}' or 'worker-{name}'."
+        )
+        raise typer.Exit(1)
+
     # --- Load & validate profile ----------------------------------------
     try:
         p = profile_mod.load(profile)
@@ -90,9 +100,7 @@ def new(
 
         with console.status("Running tmux setup script..."):
             tmux_mod.get_or_create_session(tmux_session)
-            tmux_mod.run_setup_script(
-                p.tmux_setup_script, worktree_info.path, tmux_session
-            )
+            tmux_mod.run_setup_script(p.tmux_setup_script, worktree_info.path, tmux_session)
 
         pane_ref = tmux_mod.create_pane(tmux_session, name)
 
@@ -190,7 +198,9 @@ def kill(name: str = typer.Argument(help="Name of the agent session to kill")) -
 
 
 @app.command()
-def attach(name: str = typer.Argument(help="Name or index (from 'yaam list') of the session to attach to")) -> None:
+def attach(
+    name: str = typer.Argument(help="Name or index (from 'yaam list') of the session to attach to"),
+) -> None:
     """Attach to an existing agent session."""
     store = SessionStore()
     session = store.get(name)
@@ -200,7 +210,8 @@ def attach(name: str = typer.Argument(help="Name or index (from 'yaam list') of 
 
     if not tmux_mod.pane_alive(session.tmux_pane_ref):
         console.print(
-            f"[red]Error:[/red] Pane for session '{name}' is dead. Run [bold]yaam sync --fix[/bold]."
+            f"[red]Error:[/red] Pane for session '{name}' is dead."
+            " Run [bold]yaam sync --fix[/bold]."
         )
         raise typer.Exit(1)
 
