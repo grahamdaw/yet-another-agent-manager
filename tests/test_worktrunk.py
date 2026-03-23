@@ -269,6 +269,77 @@ def test_create_list_call_has_no_extra_env(has_wt):
 
 
 # ---------------------------------------------------------------------------
+# create — existing-branch fallback
+# ---------------------------------------------------------------------------
+
+
+def test_create_falls_back_to_switch_when_branch_already_exists(has_wt):
+    """wt switch --create fails with 'already exists' → retries with wt switch."""
+    list_payload = _wt_list_json(
+        _wt_list_entry("my-branch", "/repo/my-branch", head_short="cafebabe"),
+    )
+    responses = [
+        _completed(returncode=1, stderr="Branch my-branch already exists"),  # --create fails
+        _completed(),  # wt switch (no --create) succeeds
+        _completed(stdout=list_payload),  # wt list
+    ]
+    with patch("subprocess.run", side_effect=responses) as mock_run:
+        info = create("my-branch", FAKE_REPO)
+
+    assert info.branch == "my-branch"
+    assert info.head == "cafebabe"
+    # First call: --create; second call: plain switch; third: list
+    assert mock_run.call_args_list[0].args[0] == ["wt", "switch", "--create", "my-branch"]
+    assert mock_run.call_args_list[1].args[0] == ["wt", "switch", "my-branch"]
+
+
+def test_create_fallback_raises_if_plain_switch_also_fails(has_wt):
+    """When the fallback wt switch also fails, that error is raised."""
+    responses = [
+        _completed(returncode=1, stderr="Branch my-branch already exists"),
+        _completed(returncode=1, stderr="fatal: something else"),
+    ]
+    with (
+        patch("subprocess.run", side_effect=responses),
+        pytest.raises(WorktrunkError, match="something else"),
+    ):
+        create("my-branch", FAKE_REPO)
+
+
+def test_create_no_fallback_for_unrelated_error(has_wt):
+    """A --create failure not containing 'already exists' is raised immediately."""
+    with (
+        patch(
+            "subprocess.run",
+            return_value=_completed(returncode=1, stderr="permission denied"),
+        ),
+        pytest.raises(WorktrunkError, match="permission denied"),
+    ):
+        create("my-branch", FAKE_REPO)
+
+
+def test_create_fallback_passes_env_to_plain_switch(has_wt):
+    """The WORKTRUNK_WORKTREE_PATH env is forwarded to the fallback wt switch call."""
+    list_payload = _wt_list_json(
+        _wt_list_entry("my-branch", "/repo/my-branch", head_short="cafebabe"),
+    )
+    responses = [
+        _completed(returncode=1, stderr="Branch my-branch already exists"),
+        _completed(),
+        _completed(stdout=list_payload),
+    ]
+    with patch("subprocess.run", side_effect=responses) as mock_run:
+        create("my-branch", FAKE_REPO)
+
+    fallback_kwargs = mock_run.call_args_list[1].kwargs
+    env = fallback_kwargs.get("env")
+    assert env is not None
+    assert env["WORKTRUNK_WORKTREE_PATH"] == (
+        "{{ repo_path }}/../.worktrunk-{{ repo }}.{{ branch | sanitize }}"
+    )
+
+
+# ---------------------------------------------------------------------------
 # remove
 # ---------------------------------------------------------------------------
 
