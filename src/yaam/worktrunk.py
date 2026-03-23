@@ -59,17 +59,24 @@ def _run(
 
 
 def create(branch: str, repo_path: str | Path) -> WorktreeInfo:
-    """Create a new worktree for *branch* in *repo_path*.
+    """Create or attach to a worktree for *branch* in *repo_path*.
 
-    Calls ``wt switch --create <branch>`` from repo_path and returns a
-    populated WorktreeInfo for the new worktree.
+    Calls ``wt switch --create <branch>`` from repo_path. If the branch
+    already exists, falls back to ``wt switch <branch>`` (without --create)
+    so that repeated ``yaam new`` invocations on an existing branch succeed.
+    Returns a populated WorktreeInfo for the worktree.
     """
     extra_env = {
         "WORKTRUNK_WORKTREE_PATH": (
             "{{ repo_path }}/../.worktrunk-{{ repo }}.{{ branch | sanitize }}"
         )
     }
-    _run(["switch", "--create", branch], cwd=repo_path, extra_env=extra_env)
+    try:
+        _run(["switch", "--create", branch], cwd=repo_path, extra_env=extra_env)
+    except WorktrunkError as exc:
+        if "already exists" not in str(exc).lower():
+            raise
+        _run(["switch", branch], cwd=repo_path, extra_env=extra_env)
     worktrees = list_worktrees(repo_path)
     for entry in worktrees:
         if entry.branch == branch or entry.branch.endswith(f"/{branch}"):
