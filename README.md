@@ -44,6 +44,8 @@ git pull
 uv tool install --force .
 ```
 
+The root [`Makefile`](Makefile) provides the same force reinstall: run `make install` from the repository root (equivalent to `uv tool install --force .`).
+
 **Alternative — pip in the current environment:**
 
 ```bash

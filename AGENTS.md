@@ -37,7 +37,7 @@ When making changes:
 
 ## Project Overview
 
-**yaam (Yet Another Agent Manager)** — A Python CLI tool that manages tmux sessions and git worktrees (via Worktrunk), with a path to multi-agent orchestration via LangGraph. It is **distributed as a clone-and-install** project (see README): install from the repository root with `uv tool install .` or `pip install .`, not from PyPI.
+**yaam (Yet Another Agent Manager)** — A Python CLI tool that manages tmux sessions and git worktrees (via Worktrunk), with a path to multi-agent orchestration via LangGraph. It is **distributed as a clone-and-install** project (see README): install from the repository root with `uv tool install .` or `pip install .`, not from PyPI. The root **`Makefile`** provides `make install` (`uv tool install --force .`) for upgrading from a checkout.
 
 ### Architecture
 
@@ -78,6 +78,7 @@ docs/
   README.md           # Beads usage documentation
   issues.jsonl        # Issue database
 AGENTS.md             # This file — repo state and agent instructions
+Makefile              # `make install` → `uv tool install --force .` (reinstall from checkout)
 pyproject.toml        # Project config, dependencies, ruff, entry points
 ```
 
@@ -116,7 +117,7 @@ The full implementation plan is in `docs/specs/01-init.md`. Additional specs liv
 | `langchain-anthropic` | Claude model (Stage 8)   |
 
 **External tools required:** `wt` (Worktrunk), `tmux`
-**Dev tooling:** `uv` (package manager), `ruff` (linter + formatter)
+**Dev tooling:** `uv` (package manager), `ruff` (linter + formatter), **`Makefile`** at repo root — `make install` force-reinstalls `yaam` / `yaam-worker` via `uv tool install --force .`
 
 ## Package Structure
 
