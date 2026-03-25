@@ -1,9 +1,10 @@
 """Post-init script runner."""
 
 import os
-import re
 import subprocess
 from pathlib import Path
+
+from yaam.utils import sanitize_name
 
 LOGS_DIR = Path("~/.config/yaam/logs")
 
@@ -29,7 +30,7 @@ def run(
     """
     logs_dir = LOGS_DIR.expanduser()
     logs_dir.mkdir(parents=True, exist_ok=True)
-    safe_name = re.sub(r'[/\\:*?"<>|]', "-", session_name)
+    safe_name = sanitize_name(session_name)
     log_file = logs_dir / f"{safe_name}-init.log"
 
     merged_env = {**os.environ, **env}

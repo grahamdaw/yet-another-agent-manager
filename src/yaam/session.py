@@ -20,7 +20,7 @@ class AgentSession(BaseModel):
     profile_name: str
     worktree_path: Path
     tmux_session: str
-    tmux_pane_ref: PaneRef
+    tmux_pane_ref: PaneRef | None = None
     created_at: datetime
     status: str = "running"
 

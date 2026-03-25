@@ -1,7 +1,6 @@
 """CLI entry point for the agent tool."""
 
 import contextlib
-import re
 from datetime import UTC, datetime
 
 import typer
@@ -9,6 +8,7 @@ from rich.console import Console
 from rich.table import Table
 
 from yaam import config as config_mod
+from yaam.utils import sanitize_name
 from yaam import init as init_mod
 from yaam import profile as profile_mod
 from yaam import tmux as tmux_mod
@@ -86,7 +86,7 @@ def new(
         raise typer.Exit(1)
 
     branch_name = branch or name
-    tmux_session = re.sub(r'[/\\:*?"<>|]', "-", name)
+    tmux_session = sanitize_name(name)
 
     worktree_info = None
     pane_ref = None

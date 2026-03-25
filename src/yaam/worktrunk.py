@@ -8,6 +8,8 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
+from yaam.utils import sanitize_name
+
 
 class WorktrunkNotFoundError(RuntimeError):
     """Raised when the wt binary is not found on PATH."""
@@ -58,32 +60,138 @@ def _run(
     return result
 
 
+def _normalise_branch(branch: str) -> str:
+    """Strip refs/heads/ prefix for uniform branch comparison."""
+    return branch.removeprefix("refs/heads/")
+
+
+def _branch_matches(entry_branch: str, target: str) -> bool:
+    """Return True if *entry_branch* (from wt/git list output) refers to *target*."""
+    ne = _normalise_branch(entry_branch)
+    nt = _normalise_branch(target)
+    return ne == nt or ne.endswith(f"/{nt}")
+
+
+def _git_find_worktree(branch: str, repo_path: str | Path) -> WorktreeInfo | None:
+    """Return a ``WorktreeInfo`` for *branch* by parsing ``git worktree list --porcelain``, or ``None`` if not found."""
+    result = subprocess.run(
+        ["git", "worktree", "list", "--porcelain"],
+        cwd=repo_path,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return None
+
+    norm_target = _normalise_branch(branch)
+    current: dict[str, str] = {}
+
+    def _check(block: dict[str, str]) -> WorktreeInfo | None:
+        path_str = block.get("path")
+        wt_branch = block.get("branch", "")
+        if path_str and _normalise_branch(wt_branch) == norm_target:
+            head = block.get("head", "")
+            return WorktreeInfo(
+                branch=branch,
+                path=Path(path_str),
+                status="clean",
+                head=head[:7] if len(head) >= 7 else head,
+            )
+        return None
+
+    for line in result.stdout.splitlines():
+        if line.startswith("worktree "):
+            if current:
+                found = _check(current)
+                if found:
+                    return found
+            current = {"path": line.removeprefix("worktree ").strip()}
+        elif line.startswith("HEAD "):
+            current["head"] = line.removeprefix("HEAD ").strip()
+        elif line.startswith("branch "):
+            current["branch"] = line.removeprefix("branch ").strip()
+
+    # Check the last block
+    if current:
+        return _check(current)
+    return None
+
+
+def _git_worktree_add(branch: str, repo_path: str | Path) -> None:
+    """Create a git worktree for an existing branch using ``git worktree add``.
+
+    Used as a last resort when wt switch fails and the worktree doesn't yet exist.
+    The worktree is placed next to the repo directory, mirroring wt's own path
+    convention (``../.worktrunk-<repo>.<sanitized-branch>``).
+    Raises WorktrunkError on failure so the caller sees the real git error.
+    """
+    rp = Path(repo_path).expanduser().resolve()
+    worktree_path = rp.parent / f".worktrunk-{rp.name}.{sanitize_name(branch)}"
+
+    # Clean up a stale directory left by a previous failed attempt.
+    # A properly registered git worktree has a .git file; without one the
+    # directory is an unrecoverable leftover and git will refuse to reuse it.
+    if worktree_path.exists() and not (worktree_path / ".git").exists():
+        shutil.rmtree(worktree_path)
+
+    result = subprocess.run(
+        ["git", "worktree", "add", str(worktree_path), branch],
+        cwd=rp,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        output = (result.stderr.strip() or result.stdout.strip())
+        raise WorktrunkError(f"git worktree add failed:\n{output}")
+
+
 def create(branch: str, repo_path: str | Path) -> WorktreeInfo:
     """Create or attach to a worktree for *branch* in *repo_path*.
 
-    Calls ``wt switch --create <branch>`` from repo_path. If the branch
-    already exists, falls back to ``wt switch <branch>`` (without --create)
-    so that repeated ``yaam new`` invocations on an existing branch succeed.
-    Returns a populated WorktreeInfo for the worktree.
+    Strategy:
+    1. If a worktree for the branch already exists, return it immediately.
+    2. ``wt switch --create <branch>`` — creates branch + worktree.
+    3. If branch already exists: ``wt switch <branch>`` — attaches to existing worktree.
+    4. If that also fails: ``git worktree add`` — creates worktree for the existing branch.
+    5. Locate the created worktree via ``git worktree list`` then ``wt list``.
     """
+    _require_wt()
+
+    # Strategy 1: fast path — worktree may already exist (e.g. from a previous session).
+    existing = _git_find_worktree(branch, repo_path)
+    if existing is not None:
+        return existing
+
     extra_env = {
         "WORKTRUNK_WORKTREE_PATH": (
             "{{ repo_path }}/../.worktrunk-{{ repo }}.{{ branch | sanitize }}"
         )
     }
     try:
+        # Strategy 2: create a new branch + worktree in one step.
         _run(["switch", "--create", branch], cwd=repo_path, extra_env=extra_env)
     except WorktrunkError as exc:
         if "already exists" not in str(exc).lower():
             raise
-        _run(["switch", branch], cwd=repo_path, extra_env=extra_env)
-    worktrees = list_worktrees(repo_path)
-    for entry in worktrees:
-        if entry.branch == branch or entry.branch.endswith(f"/{branch}"):
+        # Strategy 3: branch exists in git but has no worktree yet.
+        try:
+            _run(["switch", branch], cwd=repo_path, extra_env=extra_env)
+        except WorktrunkError:
+            # Strategy 4: wt switch can't attach; use git worktree add directly.
+            _git_worktree_add(branch, repo_path)
+
+    # Strategy 5: locate the newly created worktree via git, then wt list as fallback.
+    git_entry = _git_find_worktree(branch, repo_path)
+    if git_entry is not None:
+        return git_entry
+
+    for entry in list_worktrees(repo_path):
+        if _branch_matches(entry.branch, branch):
             return entry
+
     raise WorktrunkError(
-        f"wt switch --create succeeded but worktree for branch '{branch}' "
-        "not found in wt list output."
+        f"Worktree for branch '{branch}' not found after wt switch / git worktree add. "
+        "Run 'git worktree list' to inspect the state."
     )
 
 

@@ -204,8 +204,10 @@ def test_create_returns_worktree_info(has_wt):
         _wt_list_entry("my-branch", "/repo/my-branch", head_short="cafebabe"),
     )
     responses = [
+        _completed(),  # fast-path git worktree list --porcelain → None
         _completed(),  # wt switch --create
-        _completed(stdout=list_payload),  # wt list --format json
+        _completed(),  # post-switch git worktree list --porcelain → None
+        _completed(stdout=list_payload),  # wt list --format=json
     ]
     with patch("subprocess.run", side_effect=responses):
         info = create("my-branch", FAKE_REPO)
@@ -220,8 +222,10 @@ def test_create_raises_if_branch_not_in_list(has_wt):
         _wt_list_entry("other-branch", "/repo/other", head_short="000"),
     )
     responses = [
+        _completed(),  # fast-path git worktree list --porcelain → None
         _completed(),  # wt switch --create succeeds
-        _completed(stdout=list_payload),  # branch not found in list
+        _completed(),  # post-switch git worktree list --porcelain → None
+        _completed(stdout=list_payload),  # branch not found in wt list
     ]
     with (
         patch("subprocess.run", side_effect=responses),
@@ -234,7 +238,12 @@ def test_create_matches_branch_with_prefix(has_wt):
     list_payload = _wt_list_json(
         _wt_list_entry("refs/heads/my-branch", "/repo/my-branch", head_short="111"),
     )
-    responses = [_completed(), _completed(stdout=list_payload)]
+    responses = [
+        _completed(),  # fast-path git worktree list --porcelain → None
+        _completed(),  # wt switch --create
+        _completed(),  # post-switch git worktree list --porcelain → None
+        _completed(stdout=list_payload),  # wt list --format=json
+    ]
     with patch("subprocess.run", side_effect=responses):
         info = create("my-branch", FAKE_REPO)
     assert info.branch == "refs/heads/my-branch"
@@ -244,11 +253,16 @@ def test_create_injects_worktrunk_worktree_path_env(has_wt):
     list_payload = _wt_list_json(
         _wt_list_entry("my-branch", "/repo/my-branch", head_short="cafebabe"),
     )
-    responses = [_completed(), _completed(stdout=list_payload)]
+    responses = [
+        _completed(),  # fast-path git worktree list --porcelain → None
+        _completed(),  # wt switch --create
+        _completed(),  # post-switch git worktree list --porcelain → None
+        _completed(stdout=list_payload),  # wt list --format=json
+    ]
     with patch("subprocess.run", side_effect=responses) as mock_run:
         create("my-branch", FAKE_REPO)
 
-    switch_kwargs = mock_run.call_args_list[0].kwargs
+    switch_kwargs = mock_run.call_args_list[1].kwargs
     env = switch_kwargs.get("env")
     assert env is not None
     assert env["WORKTRUNK_WORKTREE_PATH"] == (
@@ -260,11 +274,16 @@ def test_create_list_call_has_no_extra_env(has_wt):
     list_payload = _wt_list_json(
         _wt_list_entry("my-branch", "/repo/my-branch", head_short="cafebabe"),
     )
-    responses = [_completed(), _completed(stdout=list_payload)]
+    responses = [
+        _completed(),  # fast-path git worktree list --porcelain → None
+        _completed(),  # wt switch --create
+        _completed(),  # post-switch git worktree list --porcelain → None
+        _completed(stdout=list_payload),  # wt list --format=json
+    ]
     with patch("subprocess.run", side_effect=responses) as mock_run:
         create("my-branch", FAKE_REPO)
 
-    list_kwargs = mock_run.call_args_list[1].kwargs
+    list_kwargs = mock_run.call_args_list[3].kwargs
     assert "env" not in list_kwargs
 
 
@@ -279,8 +298,10 @@ def test_create_falls_back_to_switch_when_branch_already_exists(has_wt):
         _wt_list_entry("my-branch", "/repo/my-branch", head_short="cafebabe"),
     )
     responses = [
+        _completed(),  # fast-path git worktree list --porcelain → None
         _completed(returncode=1, stderr="Branch my-branch already exists"),  # --create fails
         _completed(),  # wt switch (no --create) succeeds
+        _completed(),  # post-switch git worktree list --porcelain → None
         _completed(stdout=list_payload),  # wt list
     ]
     with patch("subprocess.run", side_effect=responses) as mock_run:
@@ -288,16 +309,18 @@ def test_create_falls_back_to_switch_when_branch_already_exists(has_wt):
 
     assert info.branch == "my-branch"
     assert info.head == "cafebabe"
-    # First call: --create; second call: plain switch; third: list
-    assert mock_run.call_args_list[0].args[0] == ["wt", "switch", "--create", "my-branch"]
-    assert mock_run.call_args_list[1].args[0] == ["wt", "switch", "my-branch"]
+    # [1]: --create; [2]: plain switch; [4]: wt list
+    assert mock_run.call_args_list[1].args[0] == ["wt", "switch", "--create", "my-branch"]
+    assert mock_run.call_args_list[2].args[0] == ["wt", "switch", "my-branch"]
 
 
 def test_create_fallback_raises_if_plain_switch_also_fails(has_wt):
-    """When the fallback wt switch also fails, that error is raised."""
+    """When both wt switch variants fail, git worktree add is tried and its error propagates."""
     responses = [
-        _completed(returncode=1, stderr="Branch my-branch already exists"),
-        _completed(returncode=1, stderr="fatal: something else"),
+        _completed(),  # fast-path git worktree list --porcelain → None
+        _completed(returncode=1, stderr="Branch my-branch already exists"),  # --create fails
+        _completed(returncode=1, stderr="fatal: something else"),  # plain switch fails
+        _completed(returncode=1, stderr="fatal: something else"),  # git worktree add fails
     ]
     with (
         patch("subprocess.run", side_effect=responses),
@@ -324,14 +347,16 @@ def test_create_fallback_passes_env_to_plain_switch(has_wt):
         _wt_list_entry("my-branch", "/repo/my-branch", head_short="cafebabe"),
     )
     responses = [
+        _completed(),  # fast-path git worktree list --porcelain → None
         _completed(returncode=1, stderr="Branch my-branch already exists"),
-        _completed(),
-        _completed(stdout=list_payload),
+        _completed(),  # wt switch (no --create) succeeds
+        _completed(),  # post-switch git worktree list --porcelain → None
+        _completed(stdout=list_payload),  # wt list
     ]
     with patch("subprocess.run", side_effect=responses) as mock_run:
         create("my-branch", FAKE_REPO)
 
-    fallback_kwargs = mock_run.call_args_list[1].kwargs
+    fallback_kwargs = mock_run.call_args_list[2].kwargs
     env = fallback_kwargs.get("env")
     assert env is not None
     assert env["WORKTRUNK_WORKTREE_PATH"] == (

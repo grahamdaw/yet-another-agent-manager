@@ -35,7 +35,7 @@ def get_or_create_session(name: str) -> libtmux.Session:
     """
     server = _server()
     if server.has_session(name):
-        session = server.find_where({"session_name": name})
+        session = server.sessions.get(session_name=name)
         if session is not None:
             return session
     return server.new_session(session_name=name)
@@ -79,10 +79,10 @@ def create_pane(session_name: str, window_name: str) -> PaneRef:
     Raises ValueError if the session is not found.
     """
     server = _server()
-    session = server.find_where({"session_name": session_name})
+    session = server.sessions.get(session_name=session_name)
     if session is None:
         raise ValueError(f"tmux session '{session_name}' not found")
-    window = session.find_where({"window_name": window_name})
+    window = session.windows.get(window_name=window_name)
     if window is None:
         window = session.new_window(window_name=window_name)
         pane = window.active_pane
@@ -107,14 +107,18 @@ def send_keys(pane_ref: PaneRef, keys: str) -> None:
     pane.send_keys(keys)
 
 
-def pane_alive(pane_ref: PaneRef) -> bool:
+def pane_alive(pane_ref: PaneRef | None) -> bool:
     """Return True if the pane identified by *pane_ref* still exists."""
+    if pane_ref is None:
+        return False
     server = _server()
     return server.panes.get(pane_id=pane_ref.pane_id) is not None
 
 
-def kill_pane(pane_ref: PaneRef) -> None:
+def kill_pane(pane_ref: PaneRef | None) -> None:
     """Kill the pane identified by *pane_ref*. No-op if already gone."""
+    if pane_ref is None:
+        return
     server = _server()
     pane = server.panes.get(pane_id=pane_ref.pane_id)
     if pane is not None:
@@ -130,6 +134,6 @@ def kill_session(session_name: str) -> None:
     """Kill the named tmux session. Idempotent: no-op if it does not exist."""
     server = _server()
     if server.has_session(session_name):
-        session = server.find_where({"session_name": session_name})
+        session = server.sessions.get(session_name=session_name)
         if session is not None:
             session.kill()
