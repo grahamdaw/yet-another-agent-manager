@@ -7,6 +7,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from yaam.tmux import (
+    NEW_SESSION_HEIGHT,
+    NEW_SESSION_WIDTH,
     PaneRef,
     TmuxScriptError,
     create_pane,
@@ -58,7 +60,8 @@ def _fake_server(
 ) -> MagicMock:
     server = MagicMock()
     server.has_session.return_value = has_session
-    server.find_where.return_value = session
+    server.sessions = MagicMock()
+    server.sessions.get.return_value = session
     server.panes.get.return_value = pane
     return server
 
@@ -77,7 +80,11 @@ def test_get_or_create_session_creates_new():
         result = get_or_create_session(SESSION)
 
     server.has_session.assert_called_once_with(SESSION)
-    server.new_session.assert_called_once_with(session_name=SESSION)
+    server.new_session.assert_called_once_with(
+        session_name=SESSION,
+        x=NEW_SESSION_WIDTH,
+        y=NEW_SESSION_HEIGHT,
+    )
     assert result is new_session
 
 
@@ -92,8 +99,8 @@ def test_get_or_create_session_returns_existing():
     assert result is existing
 
 
-def test_get_or_create_session_creates_if_find_where_returns_none():
-    """has_session returns True but find_where returns None — still create."""
+def test_get_or_create_session_creates_if_sessions_get_returns_none():
+    """has_session returns True but sessions.get returns None — still create."""
     server = _fake_server(has_session=True, session=None)
     new_session = _fake_session()
     server.new_session.return_value = new_session
@@ -101,7 +108,11 @@ def test_get_or_create_session_creates_if_find_where_returns_none():
     with patch("yaam.tmux._server", return_value=server):
         result = get_or_create_session(SESSION)
 
-    server.new_session.assert_called_once_with(session_name=SESSION)
+    server.new_session.assert_called_once_with(
+        session_name=SESSION,
+        x=NEW_SESSION_WIDTH,
+        y=NEW_SESSION_HEIGHT,
+    )
     assert result is new_session
 
 
@@ -117,7 +128,7 @@ def _completed(returncode=0, stderr=""):
     return proc
 
 
-def test_run_setup_script_success(tmp_path):
+def test_run_setup_script_success():
     with patch("subprocess.run", return_value=_completed()) as mock_run:
         run_setup_script(SCRIPT, WORKTREE, SESSION)
 
@@ -126,34 +137,12 @@ def test_run_setup_script_success(tmp_path):
     assert args == [str(SCRIPT), SESSION, str(WORKTREE)]
 
 
-def test_run_setup_script_writes_log(tmp_path):
-    with (
-        patch("subprocess.run", return_value=_completed()),
-        patch("yaam.tmux.LOGS_DIR", tmp_path),
-    ):
-        run_setup_script(SCRIPT, WORKTREE, SESSION)
-
-    log = tmp_path / f"{SESSION}-setup.log"
-    assert log.exists()
-
-
-def test_run_setup_script_raises_on_failure(tmp_path):
+def test_run_setup_script_raises_on_failure():
     with (
         patch("subprocess.run", return_value=_completed(returncode=1, stderr="boom")),
-        patch("yaam.tmux.LOGS_DIR", tmp_path),
-        pytest.raises(TmuxScriptError, match="boom"),
+        pytest.raises(TmuxScriptError, match="tmux setup script failed"),
     ):
         run_setup_script(SCRIPT, WORKTREE, SESSION)
-
-
-def test_run_setup_script_log_contains_session_name(tmp_path):
-    with (
-        patch("subprocess.run", return_value=_completed()),
-        patch("yaam.tmux.LOGS_DIR", tmp_path),
-    ):
-        run_setup_script(SCRIPT, WORKTREE, "my-agent")
-
-    assert (tmp_path / "my-agent-setup.log").exists()
 
 
 # ---------------------------------------------------------------------------
@@ -166,10 +155,10 @@ def test_create_pane_creates_new_window():
     win = _fake_window(pane=pane)
     win.active_pane = pane
     session = _fake_session()
-    session.find_where.return_value = None  # window doesn't exist yet
+    session.windows = MagicMock()
+    session.windows.get.return_value = None
     session.new_window.return_value = win
     server = _fake_server(session=session)
-    server.find_where.return_value = session
 
     with patch("yaam.tmux._server", return_value=server):
         ref = create_pane(SESSION, "main")
@@ -185,9 +174,9 @@ def test_create_pane_splits_existing_window():
     win = _fake_window()
     win.split.return_value = split_pane
     session = _fake_session()
-    session.find_where.return_value = win  # window already exists
+    session.windows = MagicMock()
+    session.windows.get.return_value = win
     server = _fake_server(session=session)
-    server.find_where.return_value = session
 
     with patch("yaam.tmux._server", return_value=server):
         ref = create_pane(SESSION, "main")
