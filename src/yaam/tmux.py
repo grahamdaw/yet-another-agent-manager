@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import libtmux
+from libtmux.exc import ObjectDoesNotExist
 
 # Detached `tmux new-session -d` dimensions via libtmux `x` / `y`. Large enough for setup
 # scripts to split panes before any client attaches (avoids tmux "no space for new pane").
@@ -30,6 +31,14 @@ def _server() -> libtmux.Server:
     return libtmux.Server()
 
 
+def _get(collection, **kwargs):
+    """Return collection.get(**kwargs), or None if the object does not exist."""
+    try:
+        return collection.get(**kwargs)
+    except ObjectDoesNotExist:
+        return None
+
+
 def get_or_create_session(name: str) -> libtmux.Session:
     """Return the named tmux session, creating it if it does not exist.
 
@@ -37,7 +46,7 @@ def get_or_create_session(name: str) -> libtmux.Session:
     """
     server = _server()
     if server.has_session(name):
-        session = server.sessions.get(session_name=name)
+        session = _get(server.sessions, session_name=name)
         if session is not None:
             return session
     return server.new_session(
@@ -79,10 +88,10 @@ def create_pane(session_name: str, window_name: str) -> PaneRef:
     Raises ValueError if the session is not found.
     """
     server = _server()
-    session = server.sessions.get(session_name=session_name)
+    session = _get(server.sessions, session_name=session_name)
     if session is None:
         raise ValueError(f"tmux session '{session_name}' not found")
-    window = session.windows.get(window_name=window_name)
+    window = _get(session.windows, window_name=window_name)
     if window is None:
         window = session.new_window(window_name=window_name)
         pane = window.active_pane
@@ -101,7 +110,7 @@ def send_keys(pane_ref: PaneRef, keys: str) -> None:
     Raises ValueError if the pane no longer exists.
     """
     server = _server()
-    pane = server.panes.get(pane_id=pane_ref.pane_id)
+    pane = _get(server.panes, pane_id=pane_ref.pane_id)
     if pane is None:
         raise ValueError(f"tmux pane '{pane_ref.pane_id}' not found")
     pane.send_keys(keys)
@@ -112,7 +121,7 @@ def pane_alive(pane_ref: PaneRef | None) -> bool:
     if pane_ref is None:
         return False
     server = _server()
-    return server.panes.get(pane_id=pane_ref.pane_id) is not None
+    return _get(server.panes, pane_id=pane_ref.pane_id) is not None
 
 
 def kill_pane(pane_ref: PaneRef | None) -> None:
@@ -120,7 +129,7 @@ def kill_pane(pane_ref: PaneRef | None) -> None:
     if pane_ref is None:
         return
     server = _server()
-    pane = server.panes.get(pane_id=pane_ref.pane_id)
+    pane = _get(server.panes, pane_id=pane_ref.pane_id)
     if pane is not None:
         pane.kill()
 
@@ -134,6 +143,6 @@ def kill_session(session_name: str) -> None:
     """Kill the named tmux session. Idempotent: no-op if it does not exist."""
     server = _server()
     if server.has_session(session_name):
-        session = server.sessions.get(session_name=session_name)
+        session = _get(server.sessions, session_name=session_name)
         if session is not None:
             session.kill()
