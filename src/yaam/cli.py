@@ -66,6 +66,15 @@ def new(
         )
         raise typer.Exit(1)
 
+    # --- Reject duplicate session names ----------------------------------------
+    store = SessionStore()
+    if store.get(name) is not None:
+        console.print(
+            f"[red]Error:[/red] Session '{name}' already exists."
+            f" Use [bold]yaam kill {name}[/bold] first."
+        )
+        raise typer.Exit(1)
+
     # --- Load & validate profile ----------------------------------------
     try:
         p = profile_mod.load(profile)
@@ -83,15 +92,6 @@ def new(
         console.print(f"[yellow]Profile '{profile}' has issues:[/yellow]")
         for issue in issues:
             console.print(f"  [red]•[/red] {issue}")
-        raise typer.Exit(1)
-
-    # --- Reject duplicate session names ----------------------------------------
-    store = SessionStore()
-    if store.get(name) is not None:
-        console.print(
-            f"[red]Error:[/red] Session '{name}' already exists."
-            " Use [bold]yaam kill {name}[/bold] first."
-        )
         raise typer.Exit(1)
 
     branch_name = branch or name

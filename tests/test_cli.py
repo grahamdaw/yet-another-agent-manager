@@ -77,12 +77,24 @@ def test_new_happy_path(tmp_path):
         patch("yaam.cli.SessionStore") as mock_store_cls,
         patch("yaam.cli.config_mod.load_config", return_value=_cfg()),
     ):
+        mock_store_cls.return_value.get.return_value = None
         mock_store_cls.return_value.add = MagicMock()
         result = runner.invoke(app, ["new", "foo", "--profile", "backend"])
 
     assert result.exit_code == 0
     assert "foo" in result.output
     assert "spawned" in result.output
+
+
+def test_new_duplicate_name_rejected():
+    with (
+        patch("yaam.cli.SessionStore") as mock_store_cls,
+    ):
+        mock_store_cls.return_value.get.return_value = _session()
+        result = runner.invoke(app, ["new", "foo", "--profile", "backend"])
+
+    assert result.exit_code == 1
+    assert "already exists" in result.output
 
 
 def test_new_numeric_name_rejected():
@@ -109,6 +121,7 @@ def test_new_alphanumeric_name_accepted():
         patch("yaam.cli.SessionStore") as mock_store_cls,
         patch("yaam.cli.config_mod.load_config", return_value=_cfg()),
     ):
+        mock_store_cls.return_value.get.return_value = None
         mock_store_cls.return_value.add = MagicMock()
         result = runner.invoke(app, ["new", "feature-0", "--profile", "backend"])
 
@@ -145,7 +158,9 @@ def test_new_cleans_up_on_init_failure():
         patch("yaam.cli.tmux_mod.kill_pane") as mock_kill,
         patch("yaam.cli.worktrunk.remove") as mock_remove,
         patch("yaam.cli.config_mod.load_config", return_value=_cfg()),
+        patch("yaam.cli.SessionStore") as mock_store_cls,
     ):
+        mock_store_cls.return_value.get.return_value = None
         result = runner.invoke(app, ["new", "foo", "--profile", "backend"])
 
     assert result.exit_code == 1
@@ -166,9 +181,10 @@ def test_new_init_runs_before_tmux(tmp_path):
         ),
         patch("yaam.cli.tmux_mod.run_setup_script"),
         patch("yaam.cli.tmux_mod.create_pane", return_value=_PANE_REF),
-        patch("yaam.cli.SessionStore"),
+        patch("yaam.cli.SessionStore") as mock_store_cls,
         patch("yaam.cli.config_mod.load_config", return_value=_cfg()),
     ):
+        mock_store_cls.return_value.get.return_value = None
         result = runner.invoke(app, ["new", "foo", "--profile", "backend"])
 
     assert result.exit_code == 0
@@ -186,7 +202,9 @@ def test_new_cleans_up_worktree_if_no_pane_yet():
         patch("yaam.cli.tmux_mod.kill_pane") as mock_kill,
         patch("yaam.cli.worktrunk.remove") as mock_remove,
         patch("yaam.cli.config_mod.load_config", return_value=_cfg()),
+        patch("yaam.cli.SessionStore") as mock_store_cls,
     ):
+        mock_store_cls.return_value.get.return_value = None
         result = runner.invoke(app, ["new", "foo", "--profile", "backend"])
 
     assert result.exit_code == 1
@@ -205,9 +223,10 @@ def test_new_custom_branch():
         patch("yaam.cli.tmux_mod.run_setup_script"),
         patch("yaam.cli.tmux_mod.create_pane", return_value=_PANE_REF),
         patch("yaam.cli.init_mod.run"),
-        patch("yaam.cli.SessionStore"),
+        patch("yaam.cli.SessionStore") as mock_store_cls,
         patch("yaam.cli.config_mod.load_config", return_value=_cfg()),
     ):
+        mock_store_cls.return_value.get.return_value = None
         runner.invoke(app, ["new", "foo", "--profile", "backend", "--branch", "my-custom-branch"])
 
     mock_create.assert_called_once_with("my-custom-branch", Path("/repo"))
@@ -224,9 +243,10 @@ def test_new_branch_matches_session_name():
         patch("yaam.cli.tmux_mod.run_setup_script"),
         patch("yaam.cli.tmux_mod.create_pane", return_value=_PANE_REF),
         patch("yaam.cli.init_mod.run"),
-        patch("yaam.cli.SessionStore"),
+        patch("yaam.cli.SessionStore") as mock_store_cls,
         patch("yaam.cli.config_mod.load_config", return_value=_cfg()),
     ):
+        mock_store_cls.return_value.get.return_value = None
         runner.invoke(app, ["new", "my-feature", "--profile", "backend"])
 
     mock_create.assert_called_once_with("my-feature", Path("/repo"))
