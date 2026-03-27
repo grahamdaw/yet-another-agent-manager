@@ -44,6 +44,7 @@ When making changes:
 The core model is **one feature → one session → one worktree → one agent**:
 
 - Each `yaam new` creates a **dedicated tmux session** named after the agent (slashes replaced with dashes) and a **git worktree** on the corresponding branch
+- New tmux sessions are created **detached** at **1000×500** cells (`NEW_SESSION_WIDTH` / `NEW_SESSION_HEIGHT` in `tmux.py`, passed to libtmux as `new_session(..., x=, y=)`) so setup scripts can split panes before any client attaches
 - Sessions are fully isolated — no shared tmux session between agents
 - `yaam kill` tears down the tmux session, removes the worktree, and clears the state entry
 
@@ -129,7 +130,7 @@ src/yaam/
 ├── init.py           # post-init script runner (InitScriptError, run())
 ├── profile.py        # AgentProfile model (no branch prefix), load/list_profiles/validate, _ensure_example_profile
 ├── session.py        # AgentSession model + SessionStore (filelock, JSON state file)
-├── tmux.py           # libtmux wrapper (get_or_create_session, run_setup_script[$1=session,$2=worktree], kill_session, session_alive)
+├── tmux.py           # libtmux wrapper (get_or_create_session at 1000×500 for detached new-session, run_setup_script[$1=session,$2=worktree], kill_session, session_alive)
 ├── worktrunk.py      # wt subprocess wrapper (WorktreeInfo, WorktrunkError; list via ``wt list --format=json``; sets WORKTRUNK_WORKTREE_PATH=".worktrunk-<repo>.<branch>" on create)
 ├── profiles/
 │   └── example.toml  # bundled example profile written to ~/.config/yaam/profiles/ on first run

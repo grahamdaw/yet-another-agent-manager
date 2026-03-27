@@ -108,6 +108,8 @@ This will:
 
 Each agent gets its own isolated tmux session — one feature, one session, one worktree.
 
+**Detached session size:** New tmux sessions are created detached with a fixed **1000×500** cell geometry (`tmux new-session -x 1000 -y 500` via libtmux) so layout scripts can split panes before you attach; without that, tmux’s default **80×24** often triggers “no space for new pane”.
+
 ### 3. Manage sessions
 
 ```bash

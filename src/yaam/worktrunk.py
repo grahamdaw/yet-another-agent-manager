@@ -73,7 +73,15 @@ def _branch_matches(entry_branch: str, target: str) -> bool:
 
 
 def _git_find_worktree(branch: str, repo_path: str | Path) -> WorktreeInfo | None:
-    """Return a ``WorktreeInfo`` for *branch* by parsing ``git worktree list --porcelain``, or ``None`` if not found."""
+    """Return a ``WorktreeInfo`` for *branch* by parsing ``git worktree list --porcelain``, or ``None`` if not found.
+
+    The main worktree (the repo directory itself) is intentionally excluded —
+    we only want dedicated linked worktrees created by ``wt`` / ``git worktree add``.
+    If the branch is only checked out in the main repo, ``None`` is returned so
+    the caller proceeds to create a proper worktree.
+    """
+    main_path = Path(repo_path).expanduser().resolve()
+
     result = subprocess.run(
         ["git", "worktree", "list", "--porcelain"],
         cwd=repo_path,
@@ -89,7 +97,12 @@ def _git_find_worktree(branch: str, repo_path: str | Path) -> WorktreeInfo | Non
     def _check(block: dict[str, str]) -> WorktreeInfo | None:
         path_str = block.get("path")
         wt_branch = block.get("branch", "")
-        if path_str and _normalise_branch(wt_branch) == norm_target:
+        if not path_str:
+            return None
+        # Skip the main worktree — it must not be used as an agent worktree.
+        if Path(path_str).resolve() == main_path:
+            return None
+        if _normalise_branch(wt_branch) == norm_target:
             head = block.get("head", "")
             return WorktreeInfo(
                 branch=branch,
@@ -142,7 +155,14 @@ def _git_worktree_add(branch: str, repo_path: str | Path) -> None:
     )
     if result.returncode != 0:
         output = (result.stderr.strip() or result.stdout.strip())
-        raise WorktrunkError(f"git worktree add failed:\n{output}")
+        hint = ""
+        if "already checked out" in output:
+            hint = (
+                f"\n\nHint: '{branch}' is checked out in the main repo. "
+                "Switch to a different branch there first:\n"
+                f"  cd {rp} && git checkout main"
+            )
+        raise WorktrunkError(f"git worktree add failed:\n{output}{hint}")
 
 
 def create(branch: str, repo_path: str | Path) -> WorktreeInfo:
@@ -181,13 +201,31 @@ def create(branch: str, repo_path: str | Path) -> WorktreeInfo:
             _git_worktree_add(branch, repo_path)
 
     # Strategy 5: locate the newly created worktree via git, then wt list as fallback.
+    # In both lookups we must skip the main repo directory — if the branch happens to be
+    # checked out there, treating it as the worktree would cause the init script to operate
+    # on the main repo (e.g. copying env files onto themselves).
+    main_path = Path(repo_path).expanduser().resolve()
+
     git_entry = _git_find_worktree(branch, repo_path)
     if git_entry is not None:
         return git_entry
 
     for entry in list_worktrees(repo_path):
-        if _branch_matches(entry.branch, branch):
+        if _branch_matches(entry.branch, branch) and entry.path.resolve() != main_path:
             return entry
+
+    # If we reach here and the branch is checked out in the main repo, give a clear hint.
+    main_branch_entry = next(
+        (e for e in list_worktrees(repo_path) if _branch_matches(e.branch, branch)),
+        None,
+    )
+    if main_branch_entry is not None and main_branch_entry.path.resolve() == main_path:
+        raise WorktrunkError(
+            f"Branch '{branch}' is checked out in the main repo at {main_path}.\n"
+            "A linked worktree cannot be created while the branch is active there.\n\n"
+            f"Fix: switch the main repo to a different branch first:\n"
+            f"  cd {main_path} && git checkout main"
+        )
 
     raise WorktrunkError(
         f"Worktree for branch '{branch}' not found after wt switch / git worktree add. "

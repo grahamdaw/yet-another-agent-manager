@@ -85,6 +85,15 @@ def new(
             console.print(f"  [red]•[/red] {issue}")
         raise typer.Exit(1)
 
+    # --- Reject duplicate session names ----------------------------------------
+    store = SessionStore()
+    if store.get(name) is not None:
+        console.print(
+            f"[red]Error:[/red] Session '{name}' already exists."
+            " Use [bold]yaam kill {name}[/bold] first."
+        )
+        raise typer.Exit(1)
+
     branch_name = branch or name
     tmux_session = sanitize_name(name)
 

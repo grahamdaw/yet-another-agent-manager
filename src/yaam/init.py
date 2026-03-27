@@ -26,7 +26,7 @@ def run(
     merged_env = {**os.environ, **env}
 
     result = subprocess.run(
-        [str(script_path), str(repo_path), str(worktree_path)],
+        [str(script_path), str(repo_path), str(worktree_path), str(session_name)],
         env=merged_env,
         stdout=None,
         stderr=None,
