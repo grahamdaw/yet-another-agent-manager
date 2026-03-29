@@ -3,7 +3,8 @@
 import datetime
 import json
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+import os
+from unittest.mock import MagicMock, call, patch
 
 from typer.testing import CliRunner
 
@@ -58,6 +59,35 @@ def _cfg() -> MagicMock:
 
 def _worktree_info(branch: str = "foo") -> WorktreeInfo:
     return WorktreeInfo(branch=branch, path=_WORKTREE, status="clean", head="abc123")
+
+
+# ---------------------------------------------------------------------------
+# _set_terminal_title
+# ---------------------------------------------------------------------------
+
+
+def test_set_terminal_title_writes_osc_escape():
+    from io import StringIO
+
+    from yaam.cli import _set_terminal_title
+
+    buf = StringIO()
+    with patch("sys.stdout", buf):
+        _set_terminal_title("my-session")
+
+    assert buf.getvalue() == "\033]2;my-session\007"
+
+
+def test_set_terminal_title_empty_string():
+    from io import StringIO
+
+    from yaam.cli import _set_terminal_title
+
+    buf = StringIO()
+    with patch("sys.stdout", buf):
+        _set_terminal_title("")
+
+    assert buf.getvalue() == "\033]2;\007"
 
 
 # ---------------------------------------------------------------------------
@@ -383,6 +413,35 @@ def test_attach_by_index_out_of_range():
 
     assert result.exit_code == 1
     assert "No session at index 99" in result.output
+
+
+def test_attach_sets_and_resets_title_outside_tmux():
+    with (
+        patch("yaam.cli.SessionStore") as mock_store_cls,
+        patch("yaam.cli.tmux_mod.pane_alive", return_value=True),
+        patch("subprocess.run"),
+        patch("yaam.cli._set_terminal_title") as mock_title,
+        patch.dict("os.environ", {}, clear=False),
+    ):
+        os.environ.pop("TMUX", None)
+        mock_store_cls.return_value.get.return_value = _session()
+        runner.invoke(app, ["attach", "foo"])
+
+    assert mock_title.call_args_list == [call("yaam: foo"), call("")]
+
+
+def test_attach_sets_title_inside_tmux_no_reset():
+    with (
+        patch("yaam.cli.SessionStore") as mock_store_cls,
+        patch("yaam.cli.tmux_mod.pane_alive", return_value=True),
+        patch("subprocess.run"),
+        patch("yaam.cli._set_terminal_title") as mock_title,
+        patch.dict("os.environ", {"TMUX": "/tmp/tmux/socket"}),
+    ):
+        mock_store_cls.return_value.get.return_value = _session()
+        runner.invoke(app, ["attach", "foo"])
+
+    mock_title.assert_called_once_with("yaam: foo")
 
 
 # ---------------------------------------------------------------------------
