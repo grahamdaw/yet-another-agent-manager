@@ -33,6 +33,13 @@ app.add_typer(profile_app, name="profile")
 # ---------------------------------------------------------------------------
 
 
+def _set_terminal_title(title: str) -> None:
+    """Set the terminal emulator window title via OSC 2 escape."""
+    import sys
+    sys.stdout.write(f"\033]2;{title}\007")
+    sys.stdout.flush()
+
+
 def _age(created_at: datetime) -> str:
     """Return a human-readable age string (e.g. '3d', '2h', '5m')."""
     delta = datetime.now(UTC) - created_at.astimezone(UTC)
@@ -241,9 +248,12 @@ def attach(
     import subprocess
 
     if os.environ.get("TMUX"):
+        _set_terminal_title(f"yaam: {session.name}")
         subprocess.run(["tmux", "switch-client", "-t", session.tmux_session], check=False)
     else:
+        _set_terminal_title(f"yaam: {session.name}")
         subprocess.run(["tmux", "attach-session", "-t", session.tmux_session], check=False)
+        _set_terminal_title("")  # reset on detach
 
 
 @app.command()
