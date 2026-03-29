@@ -18,7 +18,7 @@ def run(
 ) -> None:
     """Run the post-init script, streaming output to the terminal.
 
-    Calls ``script_path repo_path worktree_path`` as a subprocess.
+    Calls ``script_path repo_path worktree_path session_name`` as a subprocess.
     Merges *env* with the current process environment.  Output is streamed
     directly to stdout/stderr.
     Raises InitScriptError on non-zero exit.

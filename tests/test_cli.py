@@ -3,7 +3,8 @@
 import datetime
 import json
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+import os
+from unittest.mock import MagicMock, call, patch
 
 from typer.testing import CliRunner
 
@@ -61,6 +62,35 @@ def _worktree_info(branch: str = "foo") -> WorktreeInfo:
 
 
 # ---------------------------------------------------------------------------
+# _set_terminal_title
+# ---------------------------------------------------------------------------
+
+
+def test_set_terminal_title_writes_osc_escape():
+    from io import StringIO
+
+    from yaam.cli import _set_terminal_title
+
+    buf = StringIO()
+    with patch("sys.stdout", buf):
+        _set_terminal_title("my-session")
+
+    assert buf.getvalue() == "\033]2;my-session\007"
+
+
+def test_set_terminal_title_empty_string():
+    from io import StringIO
+
+    from yaam.cli import _set_terminal_title
+
+    buf = StringIO()
+    with patch("sys.stdout", buf):
+        _set_terminal_title("")
+
+    assert buf.getvalue() == "\033]2;\007"
+
+
+# ---------------------------------------------------------------------------
 # agent new
 # ---------------------------------------------------------------------------
 
@@ -77,12 +107,24 @@ def test_new_happy_path(tmp_path):
         patch("yaam.cli.SessionStore") as mock_store_cls,
         patch("yaam.cli.config_mod.load_config", return_value=_cfg()),
     ):
+        mock_store_cls.return_value.get.return_value = None
         mock_store_cls.return_value.add = MagicMock()
         result = runner.invoke(app, ["new", "foo", "--profile", "backend"])
 
     assert result.exit_code == 0
     assert "foo" in result.output
     assert "spawned" in result.output
+
+
+def test_new_duplicate_name_rejected():
+    with (
+        patch("yaam.cli.SessionStore") as mock_store_cls,
+    ):
+        mock_store_cls.return_value.get.return_value = _session()
+        result = runner.invoke(app, ["new", "foo", "--profile", "backend"])
+
+    assert result.exit_code == 1
+    assert "already exists" in result.output
 
 
 def test_new_numeric_name_rejected():
@@ -109,6 +151,7 @@ def test_new_alphanumeric_name_accepted():
         patch("yaam.cli.SessionStore") as mock_store_cls,
         patch("yaam.cli.config_mod.load_config", return_value=_cfg()),
     ):
+        mock_store_cls.return_value.get.return_value = None
         mock_store_cls.return_value.add = MagicMock()
         result = runner.invoke(app, ["new", "feature-0", "--profile", "backend"])
 
@@ -145,7 +188,9 @@ def test_new_cleans_up_on_init_failure():
         patch("yaam.cli.tmux_mod.kill_pane") as mock_kill,
         patch("yaam.cli.worktrunk.remove") as mock_remove,
         patch("yaam.cli.config_mod.load_config", return_value=_cfg()),
+        patch("yaam.cli.SessionStore") as mock_store_cls,
     ):
+        mock_store_cls.return_value.get.return_value = None
         result = runner.invoke(app, ["new", "foo", "--profile", "backend"])
 
     assert result.exit_code == 1
@@ -166,9 +211,10 @@ def test_new_init_runs_before_tmux(tmp_path):
         ),
         patch("yaam.cli.tmux_mod.run_setup_script"),
         patch("yaam.cli.tmux_mod.create_pane", return_value=_PANE_REF),
-        patch("yaam.cli.SessionStore"),
+        patch("yaam.cli.SessionStore") as mock_store_cls,
         patch("yaam.cli.config_mod.load_config", return_value=_cfg()),
     ):
+        mock_store_cls.return_value.get.return_value = None
         result = runner.invoke(app, ["new", "foo", "--profile", "backend"])
 
     assert result.exit_code == 0
@@ -186,7 +232,9 @@ def test_new_cleans_up_worktree_if_no_pane_yet():
         patch("yaam.cli.tmux_mod.kill_pane") as mock_kill,
         patch("yaam.cli.worktrunk.remove") as mock_remove,
         patch("yaam.cli.config_mod.load_config", return_value=_cfg()),
+        patch("yaam.cli.SessionStore") as mock_store_cls,
     ):
+        mock_store_cls.return_value.get.return_value = None
         result = runner.invoke(app, ["new", "foo", "--profile", "backend"])
 
     assert result.exit_code == 1
@@ -205,9 +253,10 @@ def test_new_custom_branch():
         patch("yaam.cli.tmux_mod.run_setup_script"),
         patch("yaam.cli.tmux_mod.create_pane", return_value=_PANE_REF),
         patch("yaam.cli.init_mod.run"),
-        patch("yaam.cli.SessionStore"),
+        patch("yaam.cli.SessionStore") as mock_store_cls,
         patch("yaam.cli.config_mod.load_config", return_value=_cfg()),
     ):
+        mock_store_cls.return_value.get.return_value = None
         runner.invoke(app, ["new", "foo", "--profile", "backend", "--branch", "my-custom-branch"])
 
     mock_create.assert_called_once_with("my-custom-branch", Path("/repo"))
@@ -224,9 +273,10 @@ def test_new_branch_matches_session_name():
         patch("yaam.cli.tmux_mod.run_setup_script"),
         patch("yaam.cli.tmux_mod.create_pane", return_value=_PANE_REF),
         patch("yaam.cli.init_mod.run"),
-        patch("yaam.cli.SessionStore"),
+        patch("yaam.cli.SessionStore") as mock_store_cls,
         patch("yaam.cli.config_mod.load_config", return_value=_cfg()),
     ):
+        mock_store_cls.return_value.get.return_value = None
         runner.invoke(app, ["new", "my-feature", "--profile", "backend"])
 
     mock_create.assert_called_once_with("my-feature", Path("/repo"))
@@ -363,6 +413,35 @@ def test_attach_by_index_out_of_range():
 
     assert result.exit_code == 1
     assert "No session at index 99" in result.output
+
+
+def test_attach_sets_and_resets_title_outside_tmux():
+    with (
+        patch("yaam.cli.SessionStore") as mock_store_cls,
+        patch("yaam.cli.tmux_mod.pane_alive", return_value=True),
+        patch("subprocess.run"),
+        patch("yaam.cli._set_terminal_title") as mock_title,
+        patch.dict("os.environ", {}, clear=False),
+    ):
+        os.environ.pop("TMUX", None)
+        mock_store_cls.return_value.get.return_value = _session()
+        runner.invoke(app, ["attach", "foo"])
+
+    assert mock_title.call_args_list == [call("yaam: foo"), call("")]
+
+
+def test_attach_sets_title_inside_tmux_no_reset():
+    with (
+        patch("yaam.cli.SessionStore") as mock_store_cls,
+        patch("yaam.cli.tmux_mod.pane_alive", return_value=True),
+        patch("subprocess.run"),
+        patch("yaam.cli._set_terminal_title") as mock_title,
+        patch.dict("os.environ", {"TMUX": "/tmp/tmux/socket"}),
+    ):
+        mock_store_cls.return_value.get.return_value = _session()
+        runner.invoke(app, ["attach", "foo"])
+
+    mock_title.assert_called_once_with("yaam: foo")
 
 
 # ---------------------------------------------------------------------------

@@ -33,6 +33,13 @@ app.add_typer(profile_app, name="profile")
 # ---------------------------------------------------------------------------
 
 
+def _set_terminal_title(title: str) -> None:
+    """Set the terminal emulator window title via OSC 2 escape."""
+    import sys
+    sys.stdout.write(f"\033]2;{title}\007")
+    sys.stdout.flush()
+
+
 def _age(created_at: datetime) -> str:
     """Return a human-readable age string (e.g. '3d', '2h', '5m')."""
     delta = datetime.now(UTC) - created_at.astimezone(UTC)
@@ -66,6 +73,15 @@ def new(
         )
         raise typer.Exit(1)
 
+    # --- Reject duplicate session names ----------------------------------------
+    store = SessionStore()
+    if store.get(name) is not None:
+        console.print(
+            f"[red]Error:[/red] Session '{name}' already exists."
+            f" Use [bold]yaam kill {name}[/bold] first."
+        )
+        raise typer.Exit(1)
+
     # --- Load & validate profile ----------------------------------------
     try:
         p = profile_mod.load(profile)
@@ -83,15 +99,6 @@ def new(
         console.print(f"[yellow]Profile '{profile}' has issues:[/yellow]")
         for issue in issues:
             console.print(f"  [red]•[/red] {issue}")
-        raise typer.Exit(1)
-
-    # --- Reject duplicate session names ----------------------------------------
-    store = SessionStore()
-    if store.get(name) is not None:
-        console.print(
-            f"[red]Error:[/red] Session '{name}' already exists."
-            " Use [bold]yaam kill {name}[/bold] first."
-        )
         raise typer.Exit(1)
 
     branch_name = branch or name
@@ -241,9 +248,12 @@ def attach(
     import subprocess
 
     if os.environ.get("TMUX"):
+        _set_terminal_title(f"yaam: {session.name}")
         subprocess.run(["tmux", "switch-client", "-t", session.tmux_session], check=False)
     else:
+        _set_terminal_title(f"yaam: {session.name}")
         subprocess.run(["tmux", "attach-session", "-t", session.tmux_session], check=False)
+        _set_terminal_title("")  # reset on detach
 
 
 @app.command()

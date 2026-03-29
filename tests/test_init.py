@@ -25,7 +25,7 @@ def test_run_calls_script_with_correct_args():
         run(SCRIPT, REPO, WORKTREE, {}, SESSION)
 
     args = mock_run.call_args[0][0]
-    assert args == [str(SCRIPT), str(REPO), str(WORKTREE)]
+    assert args == [str(SCRIPT), str(REPO), str(WORKTREE), SESSION]
 
 
 def test_run_merges_env():
