@@ -15,6 +15,7 @@ from yaam.tmux import (
     get_or_create_session,
     kill_pane,
     pane_alive,
+    pane_target,
     run_setup_script,
     send_keys,
 )
@@ -274,3 +275,13 @@ def test_pane_alive_false_after_kill():
 
     with patch("yaam.tmux._server", return_value=server):
         assert pane_alive(_pane_ref()) is False
+
+
+# ---------------------------------------------------------------------------
+# pane_target
+# ---------------------------------------------------------------------------
+
+
+def test_pane_target_returns_session_window_pane_format():
+    ref = PaneRef(session_id="$1", window_id="@2", pane_id="%3")
+    assert pane_target(ref) == "$1:@2.%3"
