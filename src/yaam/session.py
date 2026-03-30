@@ -5,17 +5,27 @@ from datetime import datetime
 from pathlib import Path
 
 from filelock import FileLock
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 from yaam.tmux import PaneRef
+from yaam.utils import sanitize_name
 
 STATE_FILE = Path("~/.config/yaam/sessions.json")
 
 
 class AgentSession(BaseModel):
-    """Persistent record of a live agent session."""
+    """Persistent record of a live agent session.
 
-    name: str
+    ``key`` is the canonical internal identifier — always equal to
+    ``sanitize_name(display_name)`` and used as the store key, tmux session
+    name, and for all internal lookups.
+
+    ``display_name`` is the original name as typed by the user and is used
+    only for display purposes (e.g. ``yaam list``).
+    """
+
+    key: str
+    display_name: str
     branch: str
     profile_name: str
     worktree_path: Path
@@ -23,6 +33,20 @@ class AgentSession(BaseModel):
     tmux_pane_ref: PaneRef | None = None
     created_at: datetime
     status: str = "running"
+
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_legacy(cls, values: object) -> object:
+        """Map legacy ``name`` field to ``key`` / ``display_name``."""
+        if not isinstance(values, dict):
+            return values
+        if "key" not in values and "name" in values:
+            display = values.pop("name")
+            values["key"] = sanitize_name(display)
+            values.setdefault("display_name", display)
+        elif "display_name" not in values and "key" in values:
+            values["display_name"] = values["key"]
+        return values
 
 
 class SessionStore:
@@ -43,16 +67,19 @@ class SessionStore:
         self._path.write_text(json.dumps(data, indent=2))
 
     def add(self, session: AgentSession) -> None:
-        """Persist *session*, overwriting any existing entry with the same name."""
+        """Persist *session*, keyed by ``session.key``.
+
+        Overwrites any existing entry with the same key.
+        """
         with self._lock:
             data = self._read()
-            data[session.name] = session.model_dump(mode="json")
+            data[session.key] = session.model_dump(mode="json")
             self._write(data)
 
-    def get(self, name: str) -> AgentSession | None:
-        """Return the session named *name*, or None if it does not exist."""
+    def get(self, key: str) -> AgentSession | None:
+        """Return the session with the given *key*, or None if it does not exist."""
         data = self._read()
-        entry = data.get(name)
+        entry = data.get(key)
         if entry is None:
             return None
         return AgentSession.model_validate(entry)
@@ -69,17 +96,17 @@ class SessionStore:
         data = self._read()
         return [AgentSession.model_validate(v) for v in data.values()]
 
-    def remove(self, name: str) -> None:
-        """Remove the session named *name*. Silent no-op if it does not exist."""
+    def remove(self, key: str) -> None:
+        """Remove the session with the given *key*. Silent no-op if it does not exist."""
         with self._lock:
             data = self._read()
-            data.pop(name, None)
+            data.pop(key, None)
             self._write(data)
 
-    def update_status(self, name: str, status: str) -> None:
+    def update_status(self, key: str, status: str) -> None:
         """Update the status field of an existing session. No-op if not found."""
         with self._lock:
             data = self._read()
-            if name in data:
-                data[name]["status"] = status
+            if key in data:
+                data[key]["status"] = status
                 self._write(data)

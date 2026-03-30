@@ -225,7 +225,8 @@ def test_create_raises_if_branch_not_in_list(has_wt):
         _completed(),  # fast-path git worktree list --porcelain → None
         _completed(),  # wt switch --create succeeds
         _completed(),  # post-switch git worktree list --porcelain → None
-        _completed(stdout=list_payload),  # branch not found in wt list
+        _completed(stdout=list_payload),  # branch not found in wt list (line 215)
+        _completed(stdout=list_payload),  # main-repo check wt list (line 221)
     ]
     with (
         patch("subprocess.run", side_effect=responses),

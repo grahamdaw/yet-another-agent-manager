@@ -2,8 +2,8 @@
 
 import datetime
 import json
-from pathlib import Path
 import os
+from pathlib import Path
 from unittest.mock import MagicMock, call, patch
 
 from typer.testing import CliRunner
@@ -40,7 +40,8 @@ def _profile(**kwargs) -> AgentProfile:
 
 def _session(**kwargs) -> AgentSession:
     defaults = dict(
-        name="foo",
+        key="foo",
+        display_name="foo",
         branch="foo",
         profile_name="backend",
         worktree_path=_WORKTREE,
@@ -288,7 +289,7 @@ def test_new_branch_matches_session_name():
 
 
 def test_list_shows_sessions():
-    sessions = [_session(name="foo"), _session(name="bar")]
+    sessions = [_session(key="foo", display_name="foo"), _session(key="bar", display_name="bar")]
     with (
         patch("yaam.cli.SessionStore") as mock_store_cls,
         patch("yaam.cli.tmux_mod.pane_alive", return_value=True),
@@ -322,7 +323,7 @@ def test_list_json_output():
     assert result.exit_code == 0
     data = json.loads(result.output)
     assert isinstance(data, list)
-    assert data[0]["name"] == "foo"
+    assert data[0]["display_name"] == "foo"
 
 
 def test_list_handles_tmux_error_gracefully():
@@ -340,7 +341,7 @@ def test_list_handles_tmux_error_gracefully():
 
 
 def test_list_shows_index_column():
-    sessions = [_session(name="foo"), _session(name="bar")]
+    sessions = [_session(key="foo", display_name="foo"), _session(key="bar", display_name="bar")]
     with (
         patch("yaam.cli.SessionStore") as mock_store_cls,
         patch("yaam.cli.tmux_mod.pane_alive", return_value=True),
@@ -442,6 +443,40 @@ def test_attach_sets_title_inside_tmux_no_reset():
         runner.invoke(app, ["attach", "foo"])
 
     mock_title.assert_called_once_with("yaam: foo")
+
+
+# ---------------------------------------------------------------------------
+# Sanitized key collision
+# ---------------------------------------------------------------------------
+
+
+def test_new_sanitized_name_collision_rejected():
+    """yaam new my-feature is rejected when my/feature already exists (same key)."""
+    with patch("yaam.cli.SessionStore") as mock_store_cls:
+        # Existing session has key "my-feature" (from display_name "my/feature")
+        mock_store_cls.return_value.get.return_value = _session(
+            key="my-feature", display_name="my/feature", tmux_session="my-feature"
+        )
+        result = runner.invoke(app, ["new", "my-feature", "--profile", "backend"])
+
+    assert result.exit_code == 1
+    assert "already exists" in result.output
+
+
+def test_kill_resolves_slashed_name():
+    """yaam kill my/feature resolves to key my-feature and kills that session."""
+    with (
+        patch("yaam.cli.SessionStore") as mock_store_cls,
+        patch("yaam.cli.tmux_mod.kill_pane"),
+        patch("yaam.cli.worktrunk.wt_available", return_value=False),
+    ):
+        mock_store_cls.return_value.get.return_value = _session(
+            key="my-feature", display_name="my/feature", tmux_session="my-feature"
+        )
+        result = runner.invoke(app, ["kill", "my/feature"])
+
+    assert result.exit_code == 0
+    mock_store_cls.return_value.remove.assert_called_once_with("my-feature")
 
 
 # ---------------------------------------------------------------------------

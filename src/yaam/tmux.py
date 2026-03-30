@@ -75,9 +75,7 @@ def run_setup_script(
     )
 
     if result.returncode != 0:
-        raise TmuxScriptError(
-            f"tmux setup script failed (exit {result.returncode})"
-        )
+        raise TmuxScriptError(f"tmux setup script failed (exit {result.returncode})")
 
 
 def create_pane(session_name: str, window_name: str) -> PaneRef:
