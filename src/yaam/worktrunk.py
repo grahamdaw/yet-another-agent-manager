@@ -73,7 +73,9 @@ def _branch_matches(entry_branch: str, target: str) -> bool:
 
 
 def _git_find_worktree(branch: str, repo_path: str | Path) -> WorktreeInfo | None:
-    """Return a ``WorktreeInfo`` for *branch* by parsing ``git worktree list --porcelain``, or ``None`` if not found.
+    """Return a ``WorktreeInfo`` for *branch* by parsing ``git worktree list --porcelain``.
+
+    Returns ``None`` if not found.
 
     The main worktree (the repo directory itself) is intentionally excluded —
     we only want dedicated linked worktrees created by ``wt`` / ``git worktree add``.
@@ -154,7 +156,7 @@ def _git_worktree_add(branch: str, repo_path: str | Path) -> None:
         text=True,
     )
     if result.returncode != 0:
-        output = (result.stderr.strip() or result.stdout.strip())
+        output = result.stderr.strip() or result.stdout.strip()
         hint = ""
         if "already checked out" in output:
             hint = (

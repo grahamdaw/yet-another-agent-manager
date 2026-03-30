@@ -8,7 +8,6 @@ from rich.console import Console
 from rich.table import Table
 
 from yaam import config as config_mod
-from yaam.utils import sanitize_name
 from yaam import init as init_mod
 from yaam import profile as profile_mod
 from yaam import tmux as tmux_mod
@@ -16,6 +15,7 @@ from yaam import worktrunk
 from yaam.init import InitScriptError  # noqa: F401 (re-exported for callers)
 from yaam.profile import ProfileValidationError
 from yaam.session import AgentSession, SessionStore
+from yaam.utils import sanitize_name
 
 app = typer.Typer(
     name="yaam",
@@ -33,9 +33,15 @@ app.add_typer(profile_app, name="profile")
 # ---------------------------------------------------------------------------
 
 
+def _session_key(name: str) -> str:
+    """Return the canonical internal session key for a user-supplied name."""
+    return sanitize_name(name)
+
+
 def _set_terminal_title(title: str) -> None:
     """Set the terminal emulator window title via OSC 2 escape."""
     import sys
+
     sys.stdout.write(f"\033]2;{title}\007")
     sys.stdout.flush()
 
@@ -75,7 +81,7 @@ def new(
 
     # --- Reject duplicate session names ----------------------------------------
     store = SessionStore()
-    if store.get(name) is not None:
+    if store.get(_session_key(name)) is not None:
         console.print(
             f"[red]Error:[/red] Session '{name}' already exists."
             f" Use [bold]yaam kill {name}[/bold] first."
@@ -122,7 +128,8 @@ def new(
 
         SessionStore().add(
             AgentSession(
-                name=name,
+                key=tmux_session,
+                display_name=name,
                 branch=branch_name,
                 profile_name=profile,
                 worktree_path=worktree_info.path,
@@ -184,7 +191,7 @@ def list_sessions(
 
         table.add_row(
             str(idx),
-            s.name,
+            s.display_name,
             s.profile_name,
             s.branch,
             status,
@@ -199,7 +206,7 @@ def list_sessions(
 def kill(name: str = typer.Argument(help="Name of the agent session to kill")) -> None:
     """Kill an agent session and clean up its resources."""
     store = SessionStore()
-    session = store.get(name)
+    session = store.get(_session_key(name))
     if session is None:
         console.print(f"[red]Error:[/red] No session named '{name}'")
         raise typer.Exit(1)
@@ -211,8 +218,8 @@ def kill(name: str = typer.Argument(help="Name of the agent session to kill")) -
         with contextlib.suppress(Exception):
             worktrunk.remove(session.worktree_path)
 
-    store.remove(name)
-    console.print(f"[green]✓[/green] Agent '[bold]{name}[/bold]' killed.")
+    store.remove(session.key)
+    console.print(f"[green]✓[/green] Agent '[bold]{session.display_name}[/bold]' killed.")
 
 
 @app.command()
@@ -232,7 +239,7 @@ def attach(
             console.print(f"[red]Error:[/red] No session at index {index}")
             raise typer.Exit(1)
     except ValueError:
-        session = store.get(name)
+        session = store.get(_session_key(name))
         if session is None:
             console.print(f"[red]Error:[/red] No session named '{name}'")
             raise typer.Exit(1) from None
@@ -248,10 +255,10 @@ def attach(
     import subprocess
 
     if os.environ.get("TMUX"):
-        _set_terminal_title(f"yaam: {session.name}")
+        _set_terminal_title(f"yaam: {session.display_name}")
         subprocess.run(["tmux", "switch-client", "-t", session.tmux_session], check=False)
     else:
-        _set_terminal_title(f"yaam: {session.name}")
+        _set_terminal_title(f"yaam: {session.display_name}")
         subprocess.run(["tmux", "attach-session", "-t", session.tmux_session], check=False)
         _set_terminal_title("")  # reset on detach
 
@@ -306,7 +313,7 @@ def sync(
 
     if fix:
         for s, _, _ in orphaned:
-            store.remove(s.name)
+            store.remove(s.key)
         console.print(f"[green]✓[/green] Removed {len(orphaned)} orphaned session(s) from store.")
 
 
