@@ -439,6 +439,27 @@ def test_attach_by_index_out_of_range():
     assert "No session at index 99" in result.output
 
 
+def test_attach_uses_pane_target_format():
+    """attach passes session_id:window_id.pane_id target, not the session name."""
+    with (
+        patch("yaam.cli.SessionStore") as mock_store_cls,
+        patch("yaam.cli.tmux_mod.pane_alive", return_value=True),
+        patch("subprocess.run") as mock_run,
+        patch.dict("os.environ", {}, clear=False),
+    ):
+        os.environ.pop("TMUX", None)
+        mock_store_cls.return_value.get.return_value = _session(
+            tmux_pane_ref=PaneRef(session_id="$3", window_id="@2", pane_id="%5"),
+            tmux_session="agent",
+        )
+        runner.invoke(app, ["attach", "foo"])
+
+    call_args = mock_run.call_args
+    cmd = call_args.args[0]
+    assert cmd[-1] == "$3:@2.%5"
+    assert "agent" not in cmd[-1]
+
+
 def test_attach_sets_and_resets_title_outside_tmux():
     with (
         patch("yaam.cli.SessionStore") as mock_store_cls,
@@ -616,6 +637,37 @@ def test_kill_removes_from_store():
         runner.invoke(app, ["kill", "foo"])
 
     mock_store_cls.return_value.remove.assert_called_once_with("foo")
+
+
+def test_kill_calls_kill_session():
+    """kill calls both kill_pane and kill_session."""
+    with (
+        patch("yaam.cli.SessionStore") as mock_store_cls,
+        patch("yaam.cli.tmux_mod.kill_pane") as mock_kill_pane,
+        patch("yaam.cli.tmux_mod.kill_session") as mock_kill_session,
+        patch("yaam.cli.worktrunk.wt_available", return_value=False),
+    ):
+        mock_store_cls.return_value.get.return_value = _session(tmux_session="agent")
+        result = runner.invoke(app, ["kill", "foo"])
+
+    assert result.exit_code == 0
+    mock_kill_pane.assert_called_once_with(_PANE_REF)
+    mock_kill_session.assert_called_once_with("agent")
+
+
+def test_kill_session_called_even_if_kill_pane_raises():
+    """kill_session is still called when kill_pane raises."""
+    with (
+        patch("yaam.cli.SessionStore") as mock_store_cls,
+        patch("yaam.cli.tmux_mod.kill_pane", side_effect=RuntimeError("pane gone")),
+        patch("yaam.cli.tmux_mod.kill_session") as mock_kill_session,
+        patch("yaam.cli.worktrunk.wt_available", return_value=False),
+    ):
+        mock_store_cls.return_value.get.return_value = _session(tmux_session="agent")
+        result = runner.invoke(app, ["kill", "foo"])
+
+    assert result.exit_code == 0
+    mock_kill_session.assert_called_once_with("agent")
 
 
 # ---------------------------------------------------------------------------

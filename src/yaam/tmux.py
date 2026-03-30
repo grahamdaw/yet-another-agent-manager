@@ -137,6 +137,11 @@ def session_alive(session_name: str) -> bool:
     return _server().has_session(session_name)
 
 
+def pane_target(pane_ref: PaneRef) -> str:
+    """Return the tmux target string for *pane_ref* in ``session:window.pane`` format."""
+    return f"{pane_ref.session_id}:{pane_ref.window_id}.{pane_ref.pane_id}"
+
+
 def kill_session(session_name: str) -> None:
     """Kill the named tmux session. Idempotent: no-op if it does not exist."""
     server = _server()

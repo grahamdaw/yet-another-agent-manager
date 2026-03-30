@@ -217,6 +217,9 @@ def kill(name: str = typer.Argument(help="Name of the agent session to kill")) -
     with contextlib.suppress(Exception):
         tmux_mod.kill_pane(session.tmux_pane_ref)
 
+    with contextlib.suppress(Exception):
+        tmux_mod.kill_session(session.tmux_session)
+
     if worktrunk.wt_available():
         with contextlib.suppress(Exception):
             worktrunk.remove(session.worktree_path)
@@ -257,12 +260,13 @@ def attach(
     import os
     import subprocess
 
+    target = tmux_mod.pane_target(session.tmux_pane_ref)
     if os.environ.get("TMUX"):
         _set_terminal_title(f"yaam: {session.display_name}")
-        subprocess.run(["tmux", "switch-client", "-t", session.tmux_session], check=False)
+        subprocess.run(["tmux", "switch-client", "-t", target], check=False)
     else:
         _set_terminal_title(f"yaam: {session.display_name}")
-        subprocess.run(["tmux", "attach-session", "-t", session.tmux_session], check=False)
+        subprocess.run(["tmux", "attach-session", "-t", target], check=False)
         _set_terminal_title("")  # reset on detach
 
 
