@@ -302,7 +302,7 @@ def sync(
 
     for s, session_ok, wt_ok in orphaned:
         table.add_row(
-            s.name,
+            s.display_name,
             s.branch,
             "[green]alive[/green]" if session_ok else "[red]dead[/red]",
             "[green]exists[/green]" if wt_ok else "[red]missing[/red]",
