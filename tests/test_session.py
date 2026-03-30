@@ -2,7 +2,10 @@
 
 import datetime as dt
 import json
+import threading
 from pathlib import Path
+
+import pytest
 
 from yaam.config import AgentConfig, load_config
 from yaam.session import AgentSession, SessionStore
@@ -227,6 +230,45 @@ def test_store_written_as_valid_json(tmp_path):
     path = tmp_path / "sessions.json"
     data = json.loads(path.read_text())
     assert "foo" in data
+
+
+# ---------------------------------------------------------------------------
+# SessionStore.add_exclusive
+# ---------------------------------------------------------------------------
+
+
+def test_add_exclusive_succeeds_for_new_key(tmp_path):
+    store = _store(tmp_path)
+    store.add_exclusive(_session(key="foo", display_name="foo"))
+    assert store.get("foo") is not None
+
+
+def test_add_exclusive_raises_for_duplicate(tmp_path):
+    store = _store(tmp_path)
+    store.add(_session(key="foo", display_name="foo"))
+    with pytest.raises(KeyError):
+        store.add_exclusive(_session(key="foo", display_name="foo"))
+
+
+def test_add_exclusive_concurrent_race_raises_for_one(tmp_path):
+    """Only one of two concurrent add_exclusive() calls for the same key succeeds."""
+    store = _store(tmp_path)
+    outcomes = []
+
+    def worker():
+        try:
+            store.add_exclusive(_session(key="foo", display_name="foo"))
+            outcomes.append("ok")
+        except KeyError:
+            outcomes.append("conflict")
+
+    threads = [threading.Thread(target=worker) for _ in range(2)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert sorted(outcomes) == ["conflict", "ok"]
 
 
 def test_store_sanitized_key_prevents_collision(tmp_path):
