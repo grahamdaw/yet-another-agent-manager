@@ -103,6 +103,7 @@ The full implementation plan is in `docs/specs/01-init.md`. Additional specs liv
 | 12    | Session name as branch  | **Done** | `05-session-name-as-branch.md`         | Branch name equals session name; `default_branch_prefix` removed                                |
 | 13    | Hidden worktree dirs    | **Done** | `08-worktrunk-hidden-worktree-dirs.md` | `create()` injects `WORKTRUNK_WORKTREE_PATH` to place worktrees as `.worktrunk-<repo>.<branch>` |
 | 14    | One session per agent   | **Done** | —                                      | Each agent gets its own tmux session; `tmux_session_name` config removed; `kill` tears down the session |
+| 15    | Atomic session create   | **Done** | `15-atomic-session-create.md`          | `SessionStore.add_exclusive()` eliminates TOCTOU race in `yaam new`; pre-flight `store.get()` check removed |
 
 ## Dependencies
 
@@ -129,7 +130,7 @@ src/yaam/
 ├── config.py         # AgentConfig model + load_config() (TOML, sensible defaults)
 ├── init.py           # post-init script runner (InitScriptError, run())
 ├── profile.py        # AgentProfile model (no branch prefix), load/list_profiles/validate, _ensure_example_profile
-├── session.py        # AgentSession model + SessionStore (filelock, JSON state file)
+├── session.py        # AgentSession model + SessionStore (filelock, JSON state file; add_exclusive() for race-safe creates)
 ├── tmux.py           # libtmux wrapper (get_or_create_session at 1000×500 for detached new-session, run_setup_script[$1=session,$2=worktree], kill_session, session_alive)
 ├── worktrunk.py      # wt subprocess wrapper (WorktreeInfo, WorktrunkError; list via ``wt list --format=json``; sets WORKTRUNK_WORKTREE_PATH=".worktrunk-<repo>.<branch>" on create)
 ├── profiles/
