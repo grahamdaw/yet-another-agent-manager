@@ -67,12 +67,25 @@ class SessionStore:
         self._path.write_text(json.dumps(data, indent=2))
 
     def add(self, session: AgentSession) -> None:
-        """Persist *session*, keyed by ``session.key``.
+        """Persist *session*, overwriting any existing entry with the same key.
 
-        Overwrites any existing entry with the same key.
+        Use add_exclusive() when creating a new session to prevent races.
         """
         with self._lock:
             data = self._read()
+            data[session.key] = session.model_dump(mode="json")
+            self._write(data)
+
+    def add_exclusive(self, session: AgentSession) -> None:
+        """Persist *session*, raising KeyError if a session with the same key already exists.
+
+        Performs the existence check and write inside a single lock acquisition, making it
+        safe to call from concurrent processes.
+        """
+        with self._lock:
+            data = self._read()
+            if session.key in data:
+                raise KeyError(session.key)
             data[session.key] = session.model_dump(mode="json")
             self._write(data)
 

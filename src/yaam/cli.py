@@ -79,15 +79,6 @@ def new(
         )
         raise typer.Exit(1)
 
-    # --- Reject duplicate session names ----------------------------------------
-    store = SessionStore()
-    if store.get(_session_key(name)) is not None:
-        console.print(
-            f"[red]Error:[/red] Session '{name}' already exists."
-            f" Use [bold]yaam kill {name}[/bold] first."
-        )
-        raise typer.Exit(1)
-
     # --- Load & validate profile ----------------------------------------
     try:
         p = profile_mod.load(profile)
@@ -126,7 +117,7 @@ def new(
 
         pane_ref = tmux_mod.create_pane(tmux_session, sanitize_name(name))
 
-        SessionStore().add(
+        SessionStore().add_exclusive(
             AgentSession(
                 key=tmux_session,
                 display_name=name,
@@ -142,6 +133,18 @@ def new(
             f"[green]✓[/green] Agent '[bold]{name}[/bold]' spawned on branch '{branch_name}'"
         )
 
+    except KeyError:
+        console.print(
+            f"\n[red]Error:[/red] Session '{name}' already exists."
+            f" Use [bold]yaam kill {name}[/bold] first."
+        )
+        if pane_ref is not None:
+            with contextlib.suppress(Exception):
+                tmux_mod.kill_pane(pane_ref)
+        if worktree_info is not None:
+            with contextlib.suppress(Exception):
+                worktrunk.remove(worktree_info.path)
+        raise typer.Exit(1) from None
     except Exception as exc:
         console.print(f"\n[red]Spawn failed:[/red] {exc}")
         if pane_ref is not None:
