@@ -217,6 +217,9 @@ def kill(name: str = typer.Argument(help="Name of the agent session to kill")) -
     with contextlib.suppress(Exception):
         tmux_mod.kill_pane(session.tmux_pane_ref)
 
+    with contextlib.suppress(Exception):
+        tmux_mod.kill_session(session.tmux_session)
+
     if worktrunk.wt_available():
         with contextlib.suppress(Exception):
             worktrunk.remove(session.worktree_path)
