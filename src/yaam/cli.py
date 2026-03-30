@@ -144,7 +144,7 @@ def new(
         if worktree_info is not None:
             with contextlib.suppress(Exception):
                 worktrunk.remove(worktree_info.path)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
     except Exception as exc:
         console.print(f"\n[red]Spawn failed:[/red] {exc}")
         if pane_ref is not None:
