@@ -3,7 +3,7 @@
 import json
 import subprocess
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 
@@ -11,6 +11,7 @@ from yaam.worktrunk import (
     WorktreeInfo,
     WorktrunkError,
     WorktrunkNotFoundError,
+    _find_main_repo,
     create,
     list_worktrees,
     merge,
@@ -387,6 +388,96 @@ def test_remove_raises_on_failure(has_wt):
         pytest.raises(WorktrunkError),
     ):
         remove(FAKE_WORKTREE)
+
+
+def test_remove_prunes_after_wt_remove(has_wt):
+    """git worktree prune is called from the main repo after wt remove."""
+    fake_main = Path("/fake")
+    with (
+        patch("yaam.worktrunk._find_main_repo", return_value=fake_main),
+        patch("subprocess.run", return_value=_completed()) as mock_run,
+    ):
+        remove(FAKE_WORKTREE)
+
+    assert mock_run.call_args_list[0] == call(
+        ["wt", "remove"],
+        cwd=FAKE_WORKTREE,
+        capture_output=True,
+        text=True,
+    )
+    assert mock_run.call_args_list[1] == call(
+        ["git", "worktree", "prune"],
+        cwd=fake_main,
+        capture_output=True,
+        text=True,
+    )
+
+
+def test_remove_skips_prune_when_main_repo_unknown(has_wt):
+    """When _find_main_repo returns None, git worktree prune is not called."""
+    with (
+        patch("yaam.worktrunk._find_main_repo", return_value=None),
+        patch("subprocess.run", return_value=_completed()) as mock_run,
+    ):
+        remove(FAKE_WORKTREE)
+
+    mock_run.assert_called_once_with(
+        ["wt", "remove"],
+        cwd=FAKE_WORKTREE,
+        capture_output=True,
+        text=True,
+    )
+
+
+def test_find_main_repo_returns_none_for_nonexistent_path():
+    """_find_main_repo returns None when the worktree directory doesn't exist."""
+    assert _find_main_repo(Path("/nonexistent/path/that/cannot/exist")) is None
+
+
+def test_find_main_repo_resolves_absolute_git_common_dir():
+    """_find_main_repo returns the parent of an absolute git-common-dir."""
+    fake_worktree = Path("/fake/worktree")
+    with (
+        patch("pathlib.Path.exists", return_value=True),
+        patch(
+            "subprocess.run",
+            return_value=_completed(stdout="/main/repo/.git\n"),
+        ),
+    ):
+        result = _find_main_repo(fake_worktree)
+
+    assert result == Path("/main/repo")
+
+
+def test_find_main_repo_resolves_relative_git_common_dir():
+    """_find_main_repo resolves a relative git-common-dir against the worktree path."""
+    fake_worktree = Path("/fake/worktree").resolve()
+    with (
+        patch("pathlib.Path.exists", return_value=True),
+        patch(
+            "subprocess.run",
+            return_value=_completed(stdout=".git\n"),
+        ),
+    ):
+        result = _find_main_repo(fake_worktree)
+
+    # relative ".git" → fake_worktree / ".git" → parent is fake_worktree
+    assert result == fake_worktree
+
+
+def test_find_main_repo_returns_none_on_git_failure():
+    """_find_main_repo returns None when git rev-parse fails."""
+    fake_worktree = Path("/fake/worktree")
+    with (
+        patch("pathlib.Path.exists", return_value=True),
+        patch(
+            "subprocess.run",
+            return_value=_completed(returncode=128, stderr="not a git repo"),
+        ),
+    ):
+        result = _find_main_repo(fake_worktree)
+
+    assert result is None
 
 
 # ---------------------------------------------------------------------------

@@ -1,5 +1,6 @@
 """Worktrunk (wt) subprocess wrapper."""
 
+import contextlib
 import json
 import os
 import shutil
@@ -235,12 +236,53 @@ def create(branch: str, repo_path: str | Path) -> WorktreeInfo:
     )
 
 
-def remove(worktree_path: str | Path) -> None:
-    """Remove the worktree at *worktree_path*.
+def _find_main_repo(worktree_path: str | Path) -> Path | None:
+    """Return the main repository root for a linked worktree.
 
-    Calls ``wt remove`` from the worktree directory.
+    Uses ``git rev-parse --git-common-dir`` which returns the path to the
+    shared ``.git`` directory owned by the main clone.  Its parent is the
+    main repository root.  Returns ``None`` if *worktree_path* does not
+    exist or is not inside a git repository.
+
+    Must be called *before* the worktree directory is removed.
     """
+    path = Path(worktree_path).expanduser().resolve()
+    if not path.exists():
+        return None
+    result = subprocess.run(
+        ["git", "rev-parse", "--git-common-dir"],
+        cwd=path,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return None
+    git_common = result.stdout.strip()
+    git_dir = Path(git_common)
+    if not git_dir.is_absolute():
+        git_dir = (path / git_dir).resolve()
+    return git_dir.parent
+
+
+def remove(worktree_path: str | Path) -> None:
+    """Remove the worktree at *worktree_path* and prune stale git refs.
+
+    1. Resolves the main repository root while the worktree directory still
+       exists (``git rev-parse --git-common-dir``).
+    2. Calls ``wt remove`` to detach and delete the worktree.
+    3. Runs ``git worktree prune`` from the main repository to clean up any
+       stale administrative files left behind.
+    """
+    main_repo = _find_main_repo(worktree_path)
     _run(["remove"], cwd=worktree_path)
+    if main_repo is not None:
+        with contextlib.suppress(Exception):
+            subprocess.run(
+                ["git", "worktree", "prune"],
+                cwd=main_repo,
+                capture_output=True,
+                text=True,
+            )
 
 
 def _worktree_from_list_entry(entry: dict) -> WorktreeInfo | None:
