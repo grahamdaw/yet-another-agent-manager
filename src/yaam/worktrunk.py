@@ -168,10 +168,22 @@ def _git_worktree_add(branch: str, repo_path: str | Path) -> None:
         raise WorktrunkError(f"git worktree add failed:\n{output}{hint}")
 
 
+def _git_fetch(repo_path: str | Path) -> None:
+    """Fetch from origin, silently ignoring failures (offline or no remote)."""
+    subprocess.run(
+        ["git", "fetch", "origin"],
+        cwd=repo_path,
+        capture_output=True,
+        text=True,
+    )
+
+
 def create(branch: str, repo_path: str | Path) -> WorktreeInfo:
     """Create or attach to a worktree for *branch* in *repo_path*.
 
     Strategy:
+    0. ``git fetch origin`` — update remote tracking refs so pre-existing remote
+       branches are visible and local branches can track their upstream.
     1. If a worktree for the branch already exists, return it immediately.
     2. ``wt switch --create <branch>`` — creates branch + worktree.
     3. If branch already exists: ``wt switch <branch>`` — attaches to existing worktree.
@@ -179,6 +191,9 @@ def create(branch: str, repo_path: str | Path) -> WorktreeInfo:
     5. Locate the created worktree via ``git worktree list`` then ``wt list``.
     """
     _require_wt()
+
+    # Strategy 0: fetch from origin so remote branches are up to date.
+    _git_fetch(repo_path)
 
     # Strategy 1: fast path — worktree may already exist (e.g. from a previous session).
     existing = _git_find_worktree(branch, repo_path)

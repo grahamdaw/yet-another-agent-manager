@@ -39,21 +39,24 @@ def _get(collection, **kwargs):
         return None
 
 
-def get_or_create_session(name: str) -> libtmux.Session:
+def get_or_create_session(
+    name: str, start_directory: str | Path | None = None
+) -> libtmux.Session:
     """Return the named tmux session, creating it if it does not exist.
 
     Idempotent: calling twice with the same name returns the same session.
+    If *start_directory* is given it is used as the working directory for the
+    initial window of a newly created session.
     """
     server = _server()
     if server.has_session(name):
         session = _get(server.sessions, session_name=name)
         if session is not None:
             return session
-    return server.new_session(
-        session_name=name,
-        x=NEW_SESSION_WIDTH,
-        y=NEW_SESSION_HEIGHT,
-    )
+    kwargs: dict = {"session_name": name, "x": NEW_SESSION_WIDTH, "y": NEW_SESSION_HEIGHT}
+    if start_directory is not None:
+        kwargs["start_directory"] = str(start_directory)
+    return server.new_session(**kwargs)
 
 
 def run_setup_script(
@@ -78,11 +81,16 @@ def run_setup_script(
         raise TmuxScriptError(f"tmux setup script failed (exit {result.returncode})")
 
 
-def create_pane(session_name: str, window_name: str) -> PaneRef:
+def create_pane(
+    session_name: str,
+    window_name: str,
+    start_directory: str | Path | None = None,
+) -> PaneRef:
     """Create or find a window in the session and return a reference to its active pane.
 
     If *window_name* already exists, splits it to create a new pane.
     If it does not exist, creates a new window.
+    If *start_directory* is given, the new window / split pane starts there.
     Raises ValueError if the session is not found.
     """
     server = _server()
@@ -91,10 +99,16 @@ def create_pane(session_name: str, window_name: str) -> PaneRef:
         raise ValueError(f"tmux session '{session_name}' not found")
     window = _get(session.windows, window_name=window_name)
     if window is None:
-        window = session.new_window(window_name=window_name)
+        win_kwargs: dict = {"window_name": window_name}
+        if start_directory is not None:
+            win_kwargs["start_directory"] = str(start_directory)
+        window = session.new_window(**win_kwargs)
         pane = window.active_pane
     else:
-        pane = window.split()
+        split_kwargs: dict = {}
+        if start_directory is not None:
+            split_kwargs["start_directory"] = str(start_directory)
+        pane = window.split(**split_kwargs)
     return PaneRef(
         session_id=pane.session_id,
         window_id=pane.window_id,

@@ -112,10 +112,12 @@ def new(
             init_mod.run(p.init_script, p.repo_path, worktree_info.path, p.init_env, name)
 
         with console.status("Running tmux setup script..."):
-            tmux_mod.get_or_create_session(tmux_session)
+            tmux_mod.get_or_create_session(tmux_session, start_directory=worktree_info.path)
             tmux_mod.run_setup_script(p.tmux_setup_script, worktree_info.path, tmux_session)
 
-        pane_ref = tmux_mod.create_pane(tmux_session, sanitize_name(name))
+        pane_ref = tmux_mod.create_pane(
+            tmux_session, sanitize_name(name), start_directory=worktree_info.path
+        )
 
         SessionStore().add_exclusive(
             AgentSession(
