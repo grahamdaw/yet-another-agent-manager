@@ -5,9 +5,8 @@ from datetime import datetime
 from pathlib import Path
 
 from filelock import FileLock
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, ConfigDict, model_validator
 
-from yaam.tmux import PaneRef
 from yaam.utils import sanitize_name
 
 STATE_FILE = Path("~/.config/yaam/sessions.json")
@@ -22,7 +21,19 @@ class AgentSession(BaseModel):
 
     ``display_name`` is the original name as typed by the user and is used
     only for display purposes (e.g. ``yaam list``).
+
+    The session is tracked at the **tmux session** level — there is a strict
+    1:1 mapping between an agent and its dedicated tmux session, so the
+    session name alone is enough to drive liveness checks, attach, and
+    teardown. Earlier versions stored a ``tmux_pane_ref`` here; that field
+    is silently dropped on load so existing ``sessions.json`` files keep
+    working.
     """
+
+    # ``extra="ignore"`` lets us silently drop the legacy ``tmux_pane_ref``
+    # field from older sessions.json entries without raising a validation
+    # error.
+    model_config = ConfigDict(extra="ignore")
 
     key: str
     display_name: str
@@ -30,7 +41,6 @@ class AgentSession(BaseModel):
     profile_name: str
     worktree_path: Path
     tmux_session: str
-    tmux_pane_ref: PaneRef | None = None
     created_at: datetime
     status: str = "running"
 

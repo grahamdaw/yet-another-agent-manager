@@ -11,7 +11,6 @@ from typer.testing import CliRunner
 from yaam.cli import app
 from yaam.profile import AgentProfile
 from yaam.session import AgentSession
-from yaam.tmux import PaneRef
 from yaam.worktrunk import WorktreeInfo
 
 runner = CliRunner()
@@ -20,7 +19,6 @@ runner = CliRunner()
 # Fixtures / helpers
 # ---------------------------------------------------------------------------
 
-_PANE_REF = PaneRef(session_id="$1", window_id="@1", pane_id="%1")
 _NOW = datetime.datetime(2026, 1, 1, 12, 0, tzinfo=datetime.UTC)
 _WORKTREE = Path("/repo/agent/foo")
 
@@ -46,7 +44,6 @@ def _session(**kwargs) -> AgentSession:
         profile_name="backend",
         worktree_path=_WORKTREE,
         tmux_session="agent",
-        tmux_pane_ref=_PANE_REF,
         created_at=_NOW,
         status="running",
     )
@@ -103,7 +100,6 @@ def test_new_happy_path(tmp_path):
         patch("yaam.cli.worktrunk.create", return_value=_worktree_info()),
         patch("yaam.cli.tmux_mod.get_or_create_session"),
         patch("yaam.cli.tmux_mod.run_setup_script"),
-        patch("yaam.cli.tmux_mod.create_pane", return_value=_PANE_REF),
         patch("yaam.cli.init_mod.run"),
         patch("yaam.cli.SessionStore") as mock_store_cls,
         patch("yaam.cli.config_mod.load_config", return_value=_cfg()),
@@ -123,7 +119,6 @@ def test_new_duplicate_name_rejected():
         patch("yaam.cli.worktrunk.create", return_value=_worktree_info()),
         patch("yaam.cli.tmux_mod.get_or_create_session"),
         patch("yaam.cli.tmux_mod.run_setup_script"),
-        patch("yaam.cli.tmux_mod.create_pane", return_value=_PANE_REF),
         patch("yaam.cli.init_mod.run"),
         patch("yaam.cli.SessionStore") as mock_store_cls,
         patch("yaam.cli.config_mod.load_config", return_value=_cfg()),
@@ -136,16 +131,15 @@ def test_new_duplicate_name_rejected():
 
 
 def test_new_duplicate_add_exclusive_cleans_up():
-    """When add_exclusive() raises KeyError, pane and worktree are torn down."""
+    """When add_exclusive() raises KeyError, the tmux session and worktree are torn down."""
     with (
         patch("yaam.cli.profile_mod.load", return_value=_profile()),
         patch("yaam.cli.profile_mod.validate", return_value=[]),
         patch("yaam.cli.worktrunk.create", return_value=_worktree_info()),
         patch("yaam.cli.tmux_mod.get_or_create_session"),
         patch("yaam.cli.tmux_mod.run_setup_script"),
-        patch("yaam.cli.tmux_mod.create_pane", return_value=_PANE_REF),
         patch("yaam.cli.init_mod.run"),
-        patch("yaam.cli.tmux_mod.kill_pane") as mock_kill,
+        patch("yaam.cli.tmux_mod.kill_session") as mock_kill_session,
         patch("yaam.cli.worktrunk.remove") as mock_remove,
         patch("yaam.cli.SessionStore") as mock_store_cls,
         patch("yaam.cli.config_mod.load_config", return_value=_cfg()),
@@ -153,7 +147,7 @@ def test_new_duplicate_add_exclusive_cleans_up():
         mock_store_cls.return_value.add_exclusive.side_effect = KeyError("foo")
         runner.invoke(app, ["new", "foo", "--profile", "backend"])
 
-    mock_kill.assert_called_once_with(_PANE_REF)
+    mock_kill_session.assert_called_once_with("foo")
     mock_remove.assert_called_once_with(_WORKTREE)
 
 
@@ -176,7 +170,6 @@ def test_new_alphanumeric_name_accepted():
         patch("yaam.cli.worktrunk.create", return_value=_worktree_info()),
         patch("yaam.cli.tmux_mod.get_or_create_session"),
         patch("yaam.cli.tmux_mod.run_setup_script"),
-        patch("yaam.cli.tmux_mod.create_pane", return_value=_PANE_REF),
         patch("yaam.cli.init_mod.run"),
         patch("yaam.cli.SessionStore") as mock_store_cls,
         patch("yaam.cli.config_mod.load_config", return_value=_cfg()),
@@ -214,7 +207,7 @@ def test_new_cleans_up_on_init_failure():
         patch("yaam.cli.profile_mod.validate", return_value=[]),
         patch("yaam.cli.worktrunk.create", return_value=_worktree_info()),
         patch("yaam.cli.init_mod.run", side_effect=InitScriptError("boom")),
-        patch("yaam.cli.tmux_mod.kill_pane") as mock_kill,
+        patch("yaam.cli.tmux_mod.kill_session") as mock_kill_session,
         patch("yaam.cli.worktrunk.remove") as mock_remove,
         patch("yaam.cli.config_mod.load_config", return_value=_cfg()),
         patch("yaam.cli.SessionStore"),
@@ -222,7 +215,7 @@ def test_new_cleans_up_on_init_failure():
         result = runner.invoke(app, ["new", "foo", "--profile", "backend"])
 
     assert result.exit_code == 1
-    mock_kill.assert_not_called()
+    mock_kill_session.assert_not_called()
     mock_remove.assert_called_once_with(_WORKTREE)
 
 
@@ -235,10 +228,9 @@ def test_new_init_runs_before_tmux(tmp_path):
         patch("yaam.cli.init_mod.run", side_effect=lambda *a, **kw: call_order.append("init")),
         patch(
             "yaam.cli.tmux_mod.get_or_create_session",
-            side_effect=lambda *a: call_order.append("tmux"),
+            side_effect=lambda *a, **kw: call_order.append("tmux"),
         ),
         patch("yaam.cli.tmux_mod.run_setup_script"),
-        patch("yaam.cli.tmux_mod.create_pane", return_value=_PANE_REF),
         patch("yaam.cli.SessionStore"),
         patch("yaam.cli.config_mod.load_config", return_value=_cfg()),
     ):
@@ -248,15 +240,16 @@ def test_new_init_runs_before_tmux(tmp_path):
     assert call_order == ["init", "tmux"]
 
 
-def test_new_cleans_up_worktree_if_no_pane_yet():
-    """Failure before create_pane should still remove the worktree."""
+def test_new_cleans_up_tmux_session_on_setup_script_failure():
+    """Failure inside run_setup_script should tear down the created tmux session and worktree."""
     with (
         patch("yaam.cli.profile_mod.load", return_value=_profile()),
         patch("yaam.cli.profile_mod.validate", return_value=[]),
         patch("yaam.cli.worktrunk.create", return_value=_worktree_info()),
+        patch("yaam.cli.init_mod.run"),
         patch("yaam.cli.tmux_mod.get_or_create_session"),
         patch("yaam.cli.tmux_mod.run_setup_script", side_effect=RuntimeError("tmux down")),
-        patch("yaam.cli.tmux_mod.kill_pane") as mock_kill,
+        patch("yaam.cli.tmux_mod.kill_session") as mock_kill_session,
         patch("yaam.cli.worktrunk.remove") as mock_remove,
         patch("yaam.cli.config_mod.load_config", return_value=_cfg()),
         patch("yaam.cli.SessionStore"),
@@ -264,7 +257,7 @@ def test_new_cleans_up_worktree_if_no_pane_yet():
         result = runner.invoke(app, ["new", "foo", "--profile", "backend"])
 
     assert result.exit_code == 1
-    mock_kill.assert_not_called()
+    mock_kill_session.assert_called_once_with("foo")
     mock_remove.assert_called_once()
 
 
@@ -277,7 +270,6 @@ def test_new_custom_branch():
         ) as mock_create,
         patch("yaam.cli.tmux_mod.get_or_create_session"),
         patch("yaam.cli.tmux_mod.run_setup_script"),
-        patch("yaam.cli.tmux_mod.create_pane", return_value=_PANE_REF),
         patch("yaam.cli.init_mod.run"),
         patch("yaam.cli.SessionStore"),
         patch("yaam.cli.config_mod.load_config", return_value=_cfg()),
@@ -296,7 +288,6 @@ def test_new_branch_matches_session_name():
         ) as mock_create,
         patch("yaam.cli.tmux_mod.get_or_create_session"),
         patch("yaam.cli.tmux_mod.run_setup_script"),
-        patch("yaam.cli.tmux_mod.create_pane", return_value=_PANE_REF),
         patch("yaam.cli.init_mod.run"),
         patch("yaam.cli.SessionStore"),
         patch("yaam.cli.config_mod.load_config", return_value=_cfg()),
@@ -315,7 +306,7 @@ def test_list_shows_sessions():
     sessions = [_session(key="foo", display_name="foo"), _session(key="bar", display_name="bar")]
     with (
         patch("yaam.cli.SessionStore") as mock_store_cls,
-        patch("yaam.cli.tmux_mod.pane_alive", return_value=True),
+        patch("yaam.cli.tmux_mod.session_alive", return_value=True),
     ):
         mock_store_cls.return_value.list.return_value = sessions
         result = runner.invoke(app, ["list"])
@@ -338,7 +329,7 @@ def test_list_json_output():
     sessions = [_session()]
     with (
         patch("yaam.cli.SessionStore") as mock_store_cls,
-        patch("yaam.cli.tmux_mod.pane_alive", return_value=True),
+        patch("yaam.cli.tmux_mod.session_alive", return_value=True),
     ):
         mock_store_cls.return_value.list.return_value = sessions
         result = runner.invoke(app, ["list", "--json"])
@@ -350,11 +341,11 @@ def test_list_json_output():
 
 
 def test_list_handles_tmux_error_gracefully():
-    """If pane_alive raises, the row is still shown with stored status."""
+    """If session_alive raises, the row is still shown with stored status."""
     sessions = [_session(status="running")]
     with (
         patch("yaam.cli.SessionStore") as mock_store_cls,
-        patch("yaam.cli.tmux_mod.pane_alive", side_effect=RuntimeError("no tmux")),
+        patch("yaam.cli.tmux_mod.session_alive", side_effect=RuntimeError("no tmux")),
     ):
         mock_store_cls.return_value.list.return_value = sessions
         result = runner.invoke(app, ["list"])
@@ -367,7 +358,7 @@ def test_list_shows_index_column():
     sessions = [_session(key="foo", display_name="foo"), _session(key="bar", display_name="bar")]
     with (
         patch("yaam.cli.SessionStore") as mock_store_cls,
-        patch("yaam.cli.tmux_mod.pane_alive", return_value=True),
+        patch("yaam.cli.tmux_mod.session_alive", return_value=True),
     ):
         mock_store_cls.return_value.list.return_value = sessions
         result = runner.invoke(app, ["list"])
@@ -386,7 +377,7 @@ def test_list_shows_index_column():
 def test_attach_happy_path():
     with (
         patch("yaam.cli.SessionStore") as mock_store_cls,
-        patch("yaam.cli.tmux_mod.pane_alive", return_value=True),
+        patch("yaam.cli.tmux_mod.session_alive", return_value=True),
         patch("subprocess.run") as mock_run,
     ):
         mock_store_cls.return_value.get.return_value = _session()
@@ -405,22 +396,38 @@ def test_attach_unknown_session():
     assert "No session" in result.output
 
 
-def test_attach_dead_pane():
+def test_attach_dead_session():
+    """When the tmux session is gone, attach fails with a helpful message."""
     with (
         patch("yaam.cli.SessionStore") as mock_store_cls,
-        patch("yaam.cli.tmux_mod.pane_alive", return_value=False),
+        patch("yaam.cli.tmux_mod.session_alive", return_value=False),
     ):
         mock_store_cls.return_value.get.return_value = _session()
         result = runner.invoke(app, ["attach", "foo"])
 
     assert result.exit_code == 1
-    assert "dead" in result.output
+    assert "gone" in result.output
+    assert "yaam new foo" in result.output
+
+
+def test_attach_works_with_dead_pane_if_session_alive():
+    """Regression: killing a pane inside the session must not block attach."""
+    with (
+        patch("yaam.cli.SessionStore") as mock_store_cls,
+        patch("yaam.cli.tmux_mod.session_alive", return_value=True),
+        patch("subprocess.run") as mock_run,
+    ):
+        mock_store_cls.return_value.get.return_value = _session()
+        result = runner.invoke(app, ["attach", "foo"])
+
+    assert result.exit_code == 0
+    mock_run.assert_called_once()
 
 
 def test_attach_by_index():
     with (
         patch("yaam.cli.SessionStore") as mock_store_cls,
-        patch("yaam.cli.tmux_mod.pane_alive", return_value=True),
+        patch("yaam.cli.tmux_mod.session_alive", return_value=True),
         patch("subprocess.run") as mock_run,
     ):
         mock_store_cls.return_value.get_by_index.return_value = _session()
@@ -439,31 +446,41 @@ def test_attach_by_index_out_of_range():
     assert "No session at index 99" in result.output
 
 
-def test_attach_uses_pane_target_format():
-    """attach passes session_id:window_id.pane_id target, not the session name."""
+def test_attach_uses_session_name_as_target():
+    """attach targets the tmux session name, not a volatile pane id."""
     with (
         patch("yaam.cli.SessionStore") as mock_store_cls,
-        patch("yaam.cli.tmux_mod.pane_alive", return_value=True),
+        patch("yaam.cli.tmux_mod.session_alive", return_value=True),
         patch("subprocess.run") as mock_run,
         patch.dict("os.environ", {}, clear=False),
     ):
         os.environ.pop("TMUX", None)
-        mock_store_cls.return_value.get.return_value = _session(
-            tmux_pane_ref=PaneRef(session_id="$3", window_id="@2", pane_id="%5"),
-            tmux_session="agent",
-        )
+        mock_store_cls.return_value.get.return_value = _session(tmux_session="agent-foo")
         runner.invoke(app, ["attach", "foo"])
 
     call_args = mock_run.call_args
     cmd = call_args.args[0]
-    assert cmd[-1] == "$3:@2.%5"
-    assert "agent" not in cmd[-1]
+    assert cmd == ["tmux", "attach-session", "-t", "agent-foo"]
+
+
+def test_attach_uses_switch_client_inside_tmux():
+    with (
+        patch("yaam.cli.SessionStore") as mock_store_cls,
+        patch("yaam.cli.tmux_mod.session_alive", return_value=True),
+        patch("subprocess.run") as mock_run,
+        patch.dict("os.environ", {"TMUX": "/tmp/tmux/socket"}),
+    ):
+        mock_store_cls.return_value.get.return_value = _session(tmux_session="agent-foo")
+        runner.invoke(app, ["attach", "foo"])
+
+    cmd = mock_run.call_args.args[0]
+    assert cmd == ["tmux", "switch-client", "-t", "agent-foo"]
 
 
 def test_attach_sets_and_resets_title_outside_tmux():
     with (
         patch("yaam.cli.SessionStore") as mock_store_cls,
-        patch("yaam.cli.tmux_mod.pane_alive", return_value=True),
+        patch("yaam.cli.tmux_mod.session_alive", return_value=True),
         patch("subprocess.run"),
         patch("yaam.cli._set_terminal_title") as mock_title,
         patch.dict("os.environ", {}, clear=False),
@@ -478,7 +495,7 @@ def test_attach_sets_and_resets_title_outside_tmux():
 def test_attach_sets_title_inside_tmux_no_reset():
     with (
         patch("yaam.cli.SessionStore") as mock_store_cls,
-        patch("yaam.cli.tmux_mod.pane_alive", return_value=True),
+        patch("yaam.cli.tmux_mod.session_alive", return_value=True),
         patch("subprocess.run"),
         patch("yaam.cli._set_terminal_title") as mock_title,
         patch.dict("os.environ", {"TMUX": "/tmp/tmux/socket"}),
@@ -502,7 +519,6 @@ def test_new_sanitized_name_collision_rejected():
         patch("yaam.cli.worktrunk.create", return_value=_worktree_info()),
         patch("yaam.cli.tmux_mod.get_or_create_session"),
         patch("yaam.cli.tmux_mod.run_setup_script"),
-        patch("yaam.cli.tmux_mod.create_pane", return_value=_PANE_REF),
         patch("yaam.cli.init_mod.run"),
         patch("yaam.cli.SessionStore") as mock_store_cls,
         patch("yaam.cli.config_mod.load_config", return_value=_cfg()),
@@ -518,7 +534,7 @@ def test_kill_resolves_slashed_name():
     """yaam kill my/feature resolves to key my-feature and kills that session."""
     with (
         patch("yaam.cli.SessionStore") as mock_store_cls,
-        patch("yaam.cli.tmux_mod.kill_pane"),
+        patch("yaam.cli.tmux_mod.kill_session"),
         patch("yaam.cli.worktrunk.wt_available", return_value=False),
     ):
         mock_store_cls.return_value.get.return_value = _session(
@@ -539,7 +555,7 @@ def test_sync_all_healthy():
     sessions = [_session()]
     with (
         patch("yaam.cli.SessionStore") as mock_store_cls,
-        patch("yaam.cli.tmux_mod.pane_alive", return_value=True),
+        patch("yaam.cli.tmux_mod.session_alive", return_value=True),
         patch("pathlib.Path.exists", return_value=True),
     ):
         mock_store_cls.return_value.list.return_value = sessions
@@ -549,11 +565,11 @@ def test_sync_all_healthy():
     assert "healthy" in result.output
 
 
-def test_sync_detects_dead_pane():
+def test_sync_detects_dead_session():
     sessions = [_session()]
     with (
         patch("yaam.cli.SessionStore") as mock_store_cls,
-        patch("yaam.cli.tmux_mod.pane_alive", return_value=False),
+        patch("yaam.cli.tmux_mod.session_alive", return_value=False),
         patch("pathlib.Path.exists", return_value=True),
     ):
         mock_store_cls.return_value.list.return_value = sessions
@@ -567,7 +583,7 @@ def test_sync_fix_removes_orphans():
     sessions = [_session()]
     with (
         patch("yaam.cli.SessionStore") as mock_store_cls,
-        patch("yaam.cli.tmux_mod.pane_alive", return_value=False),
+        patch("yaam.cli.tmux_mod.session_alive", return_value=False),
         patch("pathlib.Path.exists", return_value=True),
     ):
         mock_store_cls.return_value.list.return_value = sessions
@@ -594,7 +610,7 @@ def test_sync_empty_store():
 def test_kill_happy_path():
     with (
         patch("yaam.cli.SessionStore") as mock_store_cls,
-        patch("yaam.cli.tmux_mod.kill_pane"),
+        patch("yaam.cli.tmux_mod.kill_session"),
         patch("yaam.cli.worktrunk.wt_available", return_value=True),
         patch("yaam.cli.worktrunk.remove"),
     ):
@@ -617,7 +633,7 @@ def test_kill_unknown_session():
 def test_kill_skips_wt_if_unavailable():
     with (
         patch("yaam.cli.SessionStore") as mock_store_cls,
-        patch("yaam.cli.tmux_mod.kill_pane"),
+        patch("yaam.cli.tmux_mod.kill_session"),
         patch("yaam.cli.worktrunk.wt_available", return_value=False),
         patch("yaam.cli.worktrunk.remove") as mock_remove,
     ):
@@ -630,7 +646,7 @@ def test_kill_skips_wt_if_unavailable():
 def test_kill_removes_from_store():
     with (
         patch("yaam.cli.SessionStore") as mock_store_cls,
-        patch("yaam.cli.tmux_mod.kill_pane"),
+        patch("yaam.cli.tmux_mod.kill_session"),
         patch("yaam.cli.worktrunk.wt_available", return_value=False),
     ):
         mock_store_cls.return_value.get.return_value = _session()
@@ -640,26 +656,9 @@ def test_kill_removes_from_store():
 
 
 def test_kill_calls_kill_session():
-    """kill calls both kill_pane and kill_session."""
+    """kill tears down the tmux session by name."""
     with (
         patch("yaam.cli.SessionStore") as mock_store_cls,
-        patch("yaam.cli.tmux_mod.kill_pane") as mock_kill_pane,
-        patch("yaam.cli.tmux_mod.kill_session") as mock_kill_session,
-        patch("yaam.cli.worktrunk.wt_available", return_value=False),
-    ):
-        mock_store_cls.return_value.get.return_value = _session(tmux_session="agent")
-        result = runner.invoke(app, ["kill", "foo"])
-
-    assert result.exit_code == 0
-    mock_kill_pane.assert_called_once_with(_PANE_REF)
-    mock_kill_session.assert_called_once_with("agent")
-
-
-def test_kill_session_called_even_if_kill_pane_raises():
-    """kill_session is still called when kill_pane raises."""
-    with (
-        patch("yaam.cli.SessionStore") as mock_store_cls,
-        patch("yaam.cli.tmux_mod.kill_pane", side_effect=RuntimeError("pane gone")),
         patch("yaam.cli.tmux_mod.kill_session") as mock_kill_session,
         patch("yaam.cli.worktrunk.wt_available", return_value=False),
     ):
@@ -668,6 +667,20 @@ def test_kill_session_called_even_if_kill_pane_raises():
 
     assert result.exit_code == 0
     mock_kill_session.assert_called_once_with("agent")
+
+
+def test_kill_removes_store_entry_even_if_kill_session_raises():
+    """Store entry is always removed, even when kill_session raises."""
+    with (
+        patch("yaam.cli.SessionStore") as mock_store_cls,
+        patch("yaam.cli.tmux_mod.kill_session", side_effect=RuntimeError("tmux gone")),
+        patch("yaam.cli.worktrunk.wt_available", return_value=False),
+    ):
+        mock_store_cls.return_value.get.return_value = _session(tmux_session="agent")
+        result = runner.invoke(app, ["kill", "foo"])
+
+    assert result.exit_code == 0
+    mock_store_cls.return_value.remove.assert_called_once_with("foo")
 
 
 # ---------------------------------------------------------------------------

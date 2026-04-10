@@ -9,14 +9,12 @@ import pytest
 
 from yaam.config import AgentConfig, load_config
 from yaam.session import AgentSession, SessionStore
-from yaam.tmux import PaneRef
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 _NOW = dt.datetime(2026, 1, 1, 12, 0, 0, tzinfo=dt.UTC)
-_PANE_REF = PaneRef(session_id="$1", window_id="@1", pane_id="%1")
 
 
 def _session(**kwargs) -> AgentSession:
@@ -27,7 +25,6 @@ def _session(**kwargs) -> AgentSession:
         profile_name="backend",
         worktree_path=Path("/repo/foo"),
         tmux_session="agent",
-        tmux_pane_ref=_PANE_REF,
         created_at=_NOW,
         status="running",
     )
@@ -51,20 +48,12 @@ def test_session_round_trips_to_json():
     assert s2.key == s.key
     assert s2.display_name == s.display_name
     assert s2.profile_name == s.profile_name
-    assert s2.tmux_pane_ref.pane_id == s.tmux_pane_ref.pane_id
+    assert s2.tmux_session == s.tmux_session
 
 
-def test_session_pane_ref_serialised_as_dict():
-    data = _session().model_dump(mode="json")
-    assert isinstance(data["tmux_pane_ref"], dict)
-    assert data["tmux_pane_ref"]["pane_id"] == "%1"
-
-
-def test_session_pane_ref_deserialised_from_dict():
-    data = _session().model_dump(mode="json")
-    s = AgentSession.model_validate(data)
-    assert isinstance(s.tmux_pane_ref, PaneRef)
-    assert s.tmux_pane_ref.session_id == "$1"
+def test_session_model_has_no_pane_ref_field():
+    """tmux_pane_ref was removed — the model should not expose it."""
+    assert "tmux_pane_ref" not in AgentSession.model_fields
 
 
 def test_session_default_status_is_running():
@@ -75,10 +64,30 @@ def test_session_default_status_is_running():
         profile_name="p",
         worktree_path=Path("/r"),
         tmux_session="agent",
-        tmux_pane_ref=_PANE_REF,
         created_at=_NOW,
     )
     assert s.status == "running"
+
+
+def test_legacy_pane_ref_field_is_silently_dropped():
+    """Existing sessions.json entries with tmux_pane_ref must still load."""
+    legacy = {
+        "key": "foo",
+        "display_name": "foo",
+        "branch": "foo",
+        "profile_name": "backend",
+        "worktree_path": "/repo/foo",
+        "tmux_session": "foo",
+        "tmux_pane_ref": {"session_id": "$1", "window_id": "@1", "pane_id": "%1"},
+        "created_at": _NOW.isoformat(),
+        "status": "running",
+    }
+    s = AgentSession.model_validate(legacy)
+    assert s.key == "foo"
+    assert s.tmux_session == "foo"
+    # The legacy field is dropped — it must not be present on the model or its dump.
+    assert not hasattr(s, "tmux_pane_ref")
+    assert "tmux_pane_ref" not in s.model_dump(mode="json")
 
 
 # ---------------------------------------------------------------------------
@@ -94,7 +103,6 @@ def test_legacy_name_field_migrates_to_key_and_display_name():
         "profile_name": "backend",
         "worktree_path": "/repo/foo",
         "tmux_session": "my-feature",
-        "tmux_pane_ref": None,
         "created_at": _NOW.isoformat(),
         "status": "running",
     }
@@ -111,7 +119,6 @@ def test_legacy_name_field_plain_value_round_trips():
         "profile_name": "backend",
         "worktree_path": "/repo/foo",
         "tmux_session": "foo",
-        "tmux_pane_ref": None,
         "created_at": _NOW.isoformat(),
         "status": "running",
     }
@@ -128,7 +135,6 @@ def test_missing_display_name_falls_back_to_key():
         "profile_name": "backend",
         "worktree_path": "/repo/foo",
         "tmux_session": "my-feature",
-        "tmux_pane_ref": None,
         "created_at": _NOW.isoformat(),
         "status": "running",
     }

@@ -4,7 +4,7 @@ Nodes
 -----
 plan_node       - Supervisor breaks the goal into tasks and assigns profiles.
 dispatch_node   - Spawns an agent session per task via `yaam new`.
-monitor_node    - Polls pane liveness and result files.
+monitor_node    - Polls tmux session liveness and result files.
 collect_node    - Reads result files written by worker agents.
 review_node     - Supervisor reviews results and decides next step.
 
@@ -110,7 +110,7 @@ def dispatch_node(state: OrchestratorState) -> dict:
 
 
 def monitor_node(state: OrchestratorState) -> dict:
-    """Poll until all agents have finished (result file exists or pane is dead)."""
+    """Poll until all agents have finished (result file exists or tmux session is gone)."""
     store = session_mod.SessionStore()
     remaining = list(state["agents"])
 
@@ -129,13 +129,13 @@ def monitor_node(state: OrchestratorState) -> dict:
                 continue  # removed from store, treat as done
 
             try:
-                alive = tmux_mod.pane_alive(session.tmux_pane_ref)
+                alive = tmux_mod.session_alive(session.tmux_session)
             except Exception:
                 alive = False
 
             if alive:
                 still_running.append(name)
-            # else: pane dead without result file → collect_node will mark failure
+            # else: session gone without result file → collect_node will mark failure
 
         remaining = still_running
         if remaining:

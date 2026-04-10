@@ -102,7 +102,7 @@ def new(
     tmux_session = sanitize_name(name)
 
     worktree_info = None
-    pane_ref = None
+    session_created = False
 
     try:
         with console.status(f"Setting up worktree for branch '[cyan]{branch_name}[/cyan]'..."):
@@ -113,11 +113,8 @@ def new(
 
         with console.status("Running tmux setup script..."):
             tmux_mod.get_or_create_session(tmux_session, start_directory=worktree_info.path)
+            session_created = True
             tmux_mod.run_setup_script(p.tmux_setup_script, worktree_info.path, tmux_session)
-
-        pane_ref = tmux_mod.create_pane(
-            tmux_session, sanitize_name(name), start_directory=worktree_info.path
-        )
 
         SessionStore().add_exclusive(
             AgentSession(
@@ -127,7 +124,6 @@ def new(
                 profile_name=profile,
                 worktree_path=worktree_info.path,
                 tmux_session=tmux_session,
-                tmux_pane_ref=pane_ref,
                 created_at=datetime.now(UTC),
             )
         )
@@ -140,18 +136,18 @@ def new(
             f"\n[red]Error:[/red] Session '{name}' already exists."
             f" Use [bold]yaam kill {name}[/bold] first."
         )
-        if pane_ref is not None:
+        if session_created:
             with contextlib.suppress(Exception):
-                tmux_mod.kill_pane(pane_ref)
+                tmux_mod.kill_session(tmux_session)
         if worktree_info is not None:
             with contextlib.suppress(Exception):
                 worktrunk.remove(worktree_info.path)
         raise typer.Exit(1) from None
     except Exception as exc:
         console.print(f"\n[red]Spawn failed:[/red] {exc}")
-        if pane_ref is not None:
+        if session_created:
             with contextlib.suppress(Exception):
-                tmux_mod.kill_pane(pane_ref)
+                tmux_mod.kill_session(tmux_session)
         if worktree_info is not None:
             with contextlib.suppress(Exception):
                 worktrunk.remove(worktree_info.path)
@@ -189,7 +185,7 @@ def list_sessions(
 
     for idx, s in enumerate(sessions):
         try:
-            alive = tmux_mod.pane_alive(s.tmux_pane_ref)
+            alive = tmux_mod.session_alive(s.tmux_session)
             status = "[green]alive[/green]" if alive else "[red]dead[/red]"
         except Exception:
             status = s.status
@@ -215,9 +211,6 @@ def kill(name: str = typer.Argument(help="Name of the agent session to kill")) -
     if session is None:
         console.print(f"[red]Error:[/red] No session named '{name}'")
         raise typer.Exit(1)
-
-    with contextlib.suppress(Exception):
-        tmux_mod.kill_pane(session.tmux_pane_ref)
 
     with contextlib.suppress(Exception):
         tmux_mod.kill_session(session.tmux_session)
@@ -252,17 +245,18 @@ def attach(
             console.print(f"[red]Error:[/red] No session named '{name}'")
             raise typer.Exit(1) from None
 
-    if not tmux_mod.pane_alive(session.tmux_pane_ref):
+    if not tmux_mod.session_alive(session.tmux_session):
         console.print(
-            f"[red]Error:[/red] Pane for session '{name}' is dead."
-            " Run [bold]yaam sync --fix[/bold]."
+            f"[red]Error:[/red] tmux session for '{name}' is gone."
+            " Run [bold]yaam sync --fix[/bold] to prune it,"
+            f" or recreate it with [bold]yaam new {session.display_name}[/bold]."
         )
         raise typer.Exit(1)
 
     import os
     import subprocess
 
-    target = tmux_mod.pane_target(session.tmux_pane_ref)
+    target = session.tmux_session
     if os.environ.get("TMUX"):
         _set_terminal_title(f"yaam: {session.display_name}")
         subprocess.run(["tmux", "switch-client", "-t", target], check=False)
@@ -289,7 +283,7 @@ def sync(
 
     for s in sessions:
         try:
-            alive = tmux_mod.pane_alive(s.tmux_pane_ref)
+            alive = tmux_mod.session_alive(s.tmux_session)
         except Exception:
             alive = False
         worktree_exists = s.worktree_path.exists()

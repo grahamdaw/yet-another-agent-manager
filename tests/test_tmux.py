@@ -1,4 +1,4 @@
-"""Unit tests for agent.tmux module."""
+"""Unit tests for yaam.tmux module."""
 
 import subprocess
 from pathlib import Path
@@ -9,15 +9,11 @@ import pytest
 from yaam.tmux import (
     NEW_SESSION_HEIGHT,
     NEW_SESSION_WIDTH,
-    PaneRef,
     TmuxScriptError,
-    create_pane,
     get_or_create_session,
-    kill_pane,
-    pane_alive,
-    pane_target,
+    kill_session,
     run_setup_script,
-    send_keys,
+    session_alive,
 )
 
 # ---------------------------------------------------------------------------
@@ -29,25 +25,6 @@ WORKTREE = Path("/fake/worktree")
 SESSION = "agent-foo"
 
 
-def _pane_ref(session_id="$1", window_id="@1", pane_id="%1") -> PaneRef:
-    return PaneRef(session_id=session_id, window_id=window_id, pane_id=pane_id)
-
-
-def _fake_pane(pane_id="%1", window_id="@1", session_id="$1") -> MagicMock:
-    pane = MagicMock()
-    pane.pane_id = pane_id
-    pane.window_id = window_id
-    pane.session_id = session_id
-    return pane
-
-
-def _fake_window(name="main", pane: MagicMock | None = None) -> MagicMock:
-    win = MagicMock()
-    win.window_name = name
-    win.active_pane = pane or _fake_pane()
-    return win
-
-
 def _fake_session(name=SESSION) -> MagicMock:
     sess = MagicMock()
     sess.session_name = name
@@ -57,13 +34,11 @@ def _fake_session(name=SESSION) -> MagicMock:
 def _fake_server(
     has_session: bool = False,
     session: MagicMock | None = None,
-    pane: MagicMock | None = None,
 ) -> MagicMock:
     server = MagicMock()
     server.has_session.return_value = has_session
     server.sessions = MagicMock()
     server.sessions.get.return_value = session
-    server.panes.get.return_value = pane
     return server
 
 
@@ -117,6 +92,21 @@ def test_get_or_create_session_creates_if_sessions_get_returns_none():
     assert result is new_session
 
 
+def test_get_or_create_session_passes_start_directory():
+    server = _fake_server(has_session=False)
+    server.new_session.return_value = _fake_session()
+
+    with patch("yaam.tmux._server", return_value=server):
+        get_or_create_session(SESSION, start_directory=WORKTREE)
+
+    server.new_session.assert_called_once_with(
+        session_name=SESSION,
+        x=NEW_SESSION_WIDTH,
+        y=NEW_SESSION_HEIGHT,
+        start_directory=str(WORKTREE),
+    )
+
+
 # ---------------------------------------------------------------------------
 # run_setup_script
 # ---------------------------------------------------------------------------
@@ -147,141 +137,53 @@ def test_run_setup_script_raises_on_failure():
 
 
 # ---------------------------------------------------------------------------
-# create_pane
+# session_alive
 # ---------------------------------------------------------------------------
 
 
-def test_create_pane_creates_new_window():
-    pane = _fake_pane()
-    win = _fake_window(pane=pane)
-    win.active_pane = pane
+def test_session_alive_true():
+    server = _fake_server(has_session=True)
+
+    with patch("yaam.tmux._server", return_value=server):
+        assert session_alive(SESSION) is True
+
+    server.has_session.assert_called_once_with(SESSION)
+
+
+def test_session_alive_false():
+    server = _fake_server(has_session=False)
+
+    with patch("yaam.tmux._server", return_value=server):
+        assert session_alive(SESSION) is False
+
+
+# ---------------------------------------------------------------------------
+# kill_session
+# ---------------------------------------------------------------------------
+
+
+def test_kill_session_kills_live_session():
     session = _fake_session()
-    session.windows = MagicMock()
-    session.windows.get.return_value = None
-    session.new_window.return_value = win
-    server = _fake_server(session=session)
+    server = _fake_server(has_session=True, session=session)
 
     with patch("yaam.tmux._server", return_value=server):
-        ref = create_pane(SESSION, "main")
+        kill_session(SESSION)
 
-    session.new_window.assert_called_once_with(window_name="main")
-    assert ref.pane_id == pane.pane_id
-    assert ref.window_id == pane.window_id
-    assert ref.session_id == pane.session_id
+    session.kill.assert_called_once()
 
 
-def test_create_pane_splits_existing_window():
-    split_pane = _fake_pane(pane_id="%2")
-    win = _fake_window()
-    win.split.return_value = split_pane
-    session = _fake_session()
-    session.windows = MagicMock()
-    session.windows.get.return_value = win
-    server = _fake_server(session=session)
+def test_kill_session_noop_when_absent():
+    server = _fake_server(has_session=False)
 
     with patch("yaam.tmux._server", return_value=server):
-        ref = create_pane(SESSION, "main")
+        kill_session(SESSION)  # must not raise
 
-    win.split.assert_called_once()
-    assert ref.pane_id == "%2"
-
-
-def test_create_pane_raises_if_session_missing():
-    server = _fake_server(session=None)
-
-    with (
-        patch("yaam.tmux._server", return_value=server),
-        pytest.raises(ValueError, match="not found"),
-    ):
-        create_pane(SESSION, "main")
+    server.sessions.get.assert_not_called()
 
 
-# ---------------------------------------------------------------------------
-# send_keys
-# ---------------------------------------------------------------------------
-
-
-def test_send_keys_calls_pane():
-    pane = _fake_pane()
-    server = _fake_server(pane=pane)
+def test_kill_session_noop_when_get_returns_none():
+    """has_session is True but sessions.get returns None — swallow quietly."""
+    server = _fake_server(has_session=True, session=None)
 
     with patch("yaam.tmux._server", return_value=server):
-        send_keys(_pane_ref(), "ls -la")
-
-    pane.send_keys.assert_called_once_with("ls -la")
-
-
-def test_send_keys_raises_if_pane_dead():
-    server = _fake_server(pane=None)
-
-    with (
-        patch("yaam.tmux._server", return_value=server),
-        pytest.raises(ValueError, match="not found"),
-    ):
-        send_keys(_pane_ref(), "ls")
-
-
-# ---------------------------------------------------------------------------
-# kill_pane
-# ---------------------------------------------------------------------------
-
-
-def test_kill_pane_kills_live_pane():
-    pane = _fake_pane()
-    server = _fake_server(pane=pane)
-
-    with patch("yaam.tmux._server", return_value=server):
-        kill_pane(_pane_ref())
-
-    pane.kill.assert_called_once()
-
-
-def test_kill_pane_idempotent_when_dead():
-    """Calling kill_pane on an already-dead pane must not raise."""
-    server = _fake_server(pane=None)
-
-    with patch("yaam.tmux._server", return_value=server):
-        kill_pane(_pane_ref())  # should not raise
-
-
-# ---------------------------------------------------------------------------
-# pane_alive
-# ---------------------------------------------------------------------------
-
-
-def test_pane_alive_true():
-    pane = _fake_pane()
-    server = _fake_server(pane=pane)
-
-    with patch("yaam.tmux._server", return_value=server):
-        assert pane_alive(_pane_ref()) is True
-
-
-def test_pane_alive_false():
-    server = _fake_server(pane=None)
-
-    with patch("yaam.tmux._server", return_value=server):
-        assert pane_alive(_pane_ref()) is False
-
-
-def test_pane_alive_false_after_kill():
-    pane = _fake_pane()
-    server = MagicMock()
-    # First call (kill) finds the pane; second call (alive check) returns None
-    server.panes.get.side_effect = [pane, None]
-
-    with patch("yaam.tmux._server", return_value=server):
-        kill_pane(_pane_ref())
-
-    with patch("yaam.tmux._server", return_value=server):
-        assert pane_alive(_pane_ref()) is False
-
-
-# ---------------------------------------------------------------------------
-# pane_target
-# ---------------------------------------------------------------------------
-
-
-def test_pane_target_returns_session_window_pane_format():
-    ref = PaneRef(session_id="$1", window_id="@2", pane_id="%3")
-    assert pane_target(ref) == "$1:@2.%3"
+        kill_session(SESSION)  # must not raise
