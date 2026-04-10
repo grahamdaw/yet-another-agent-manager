@@ -92,7 +92,7 @@ The full implementation plan is in `docs/specs/01-init.md`. Additional specs liv
 | 1     | Project scaffold        | **Done** | `01-init.md`                           | CLI skeleton with `typer`, `rich`, `pydantic`, `libtmux`                                        |
 | 2     | Worktrunk wrapper       | **Done** | `01-init.md`                           | Python wrapper around `wt` CLI commands                                                         |
 | 3     | Profile system          | **Done** | `01-init.md`                           | Named profile configs for agent roles                                                           |
-| 4     | tmux wrapper            | **Done** | `01-init.md`                           | `libtmux` wrapper for managing panes                                                            |
+| 4     | tmux wrapper            | **Done** | `01-init.md`                           | `libtmux` wrapper for managing tmux sessions                                                    |
 | 5     | Session state           | **Done** | `01-init.md`                           | Persistent session store (`sessions.json`)                                                      |
 | 6     | Core commands           | **Done** | `01-init.md`                           | `yaam new`, `yaam list`, `yaam kill`                                                            |
 | 7     | Attach and sync         | **Done** | `01-init.md`                           | `yaam attach`, `yaam sync`                                                                      |
@@ -104,6 +104,7 @@ The full implementation plan is in `docs/specs/01-init.md`. Additional specs liv
 | 13    | Hidden worktree dirs    | **Done** | `08-worktrunk-hidden-worktree-dirs.md` | `create()` injects `WORKTRUNK_WORKTREE_PATH` to place worktrees as `.worktrunk-<repo>.<branch>` |
 | 14    | One session per agent   | **Done** | —                                      | Each agent gets its own tmux session; `tmux_session_name` config removed; `kill` tears down the session |
 | 15    | Atomic session create   | **Done** | `15-atomic-session-create.md`          | `SessionStore.add_exclusive()` eliminates TOCTOU race in `yaam new`; pre-flight `store.get()` check removed |
+| 16    | Track tmux sessions     | **Done** | —                                      | Drop `tmux_pane_ref` tracking; liveness/attach/teardown all key off the tmux session name (legacy `tmux_pane_ref` field silently dropped on load) |
 
 ## Dependencies
 
@@ -143,10 +144,10 @@ src/yaam/
 tests/
 ├── test_worktrunk.py    # 19 tests with subprocess mocking
 ├── test_profile.py      # 17 tests for profile load/list/validate/example
-├── test_tmux.py         # 17 tests for libtmux wrapper (fully mocked)
-├── test_session.py      # 21 tests for AgentSession, SessionStore, AgentConfig
+├── test_tmux.py         # 11 tests for libtmux wrapper (fully mocked)
+├── test_session.py      # 32 tests for AgentSession, SessionStore, AgentConfig
 ├── test_init.py         # 7 tests for init script runner
-├── test_cli.py          # 25 tests for CLI commands via CliRunner (incl. doctor)
+├── test_cli.py          # 44 tests for CLI commands via CliRunner (incl. doctor)
 └── test_orchestrator.py # 19 tests for models, worker, graph nodes, and agent run command
 README.md             # Clone-and-install, quickstart, profile authoring guide, commands reference
 ```
